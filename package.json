@@ -1,0 +1,14 @@
+{
+  "name": "free-pdf-forms",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Free PDF Forms & Government Resources",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run"
+  },
+  "devDependencies": {
+    "wrangler": "4.127.1"
+  }
+}
