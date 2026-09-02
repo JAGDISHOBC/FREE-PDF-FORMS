@@ -1,0 +1,16 @@
+node_modules/
+.wrangler/
+.dev.vars
+.env
+.env.*
+!.env.example
+*.log
+src/worker-backup*.js
+wrangler-backup*.jsonc
+
+# Local test and backup files
+*-backup.js
+*-backup.html
+*-TEST.txt
+*.tmp
+

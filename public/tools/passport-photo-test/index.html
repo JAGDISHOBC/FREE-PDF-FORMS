@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Passport Photo Maker</title>
+<style>
+:root{--text:#172033;--muted:#64748b;--border:#dbe2ec;--bg:#f5f7fb;--card:#fff;--primary:#172033;--danger:#9f1239}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:900px;margin:0 auto;padding:26px 15px 60px}.card{background:#fff;border:1px solid #e5e9f2;border-radius:18px;padding:24px;box-shadow:0 8px 30px rgba(20,30,50,.06)}
+h1{margin:0 0 7px;font-size:30px}.sub{margin:0 0 22px;color:var(--muted)}
+.upload{border:2px dashed #cbd5e1;border-radius:16px;padding:30px 18px;text-align:center;background:#fafcff;transition:.15s}.upload.drag{border-color:#172033;background:#f4f6f9}
+.upload-icon{font-size:44px}.choose{display:inline-flex;margin-top:14px;padding:11px 18px;border:0;border-radius:10px;background:var(--primary);color:#fff;font-weight:750;cursor:pointer}.upload input{display:none}
+.file{margin-top:12px;color:var(--muted);font-size:13px}
+.editor{display:none;margin-top:22px}.editor.show{display:block}
+.preview{display:flex;justify-content:center;align-items:center;min-height:330px;background:#eef2f7;border:1px solid var(--border);border-radius:14px;padding:18px;overflow:hidden}
+#previewImage{max-width:100%;max-height:420px;display:block;border-radius:5px;box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.tool{border:1px solid var(--border);background:#fff;color:var(--text);border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer}.tool:disabled{opacity:.45;cursor:not-allowed}
+.ai-box{margin-top:18px;padding:16px;border:1px solid #dbe2ec;border-radius:14px;background:#fafcff}.ai-title{font-weight:800}.ai-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}
+.ai{border:0;border-radius:9px;padding:10px 13px;background:#172033;color:#fff;font-weight:750;cursor:pointer}.ai:disabled{opacity:.5;cursor:not-allowed}.ai-dress{background:#475569}
+.ai-limit{font-size:12px;color:var(--muted);margin-top:9px}
+.simple{margin-top:18px;padding:17px;border:1px solid var(--border);border-radius:14px}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}.field label{font-weight:750;font-size:14px}
+input[type=number],input[type=text],select{width:100%;padding:12px 13px;border:1px solid var(--border);border-radius:10px;background:#fff;font-size:15px;outline:none}
+input[type=range]{width:100%}
+.advanced-toggle{margin-top:15px;width:100%;display:flex;justify-content:space-between;align-items:center;padding:13px 14px;border:1px solid var(--border);border-radius:10px;background:#f8fafc;color:var(--text);font-weight:800;cursor:pointer}
+.advanced{display:none;padding-top:16px}.advanced.open{display:block}.crop-box{margin-bottom:16px;padding:14px;border:1px solid var(--border);border-radius:12px;background:#fafcff}.crop-title{font-weight:800;margin-bottom:10px}.crop-help{font-size:12px;color:var(--muted);margin:-4px 0 12px}.crop-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}.crop-actions button{border:1px solid var(--border);background:#fff;color:var(--text);border-radius:9px;padding:9px 12px;font-weight:750;cursor:pointer}.hd-box{margin-top:14px;padding:13px 14px;border:1px solid var(--border);border-radius:12px;background:#fafcff}.hd-box label{display:flex;align-items:flex-start;gap:10px;font-weight:800;cursor:pointer}.hd-box input{margin-top:3px}.hd-note{font-size:12px;color:var(--muted);margin-top:5px;margin-left:25px}.advanced-actions{font-size:13px;color:var(--muted)}
+.advanced-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:4px}.advanced-actions button{border:0;border-radius:9px;padding:10px 13px;font-weight:750;cursor:pointer}.process{background:var(--primary);color:#fff}.reset{background:#edf1f6;color:var(--text)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}.main-btn{padding:12px 18px;border:0;border-radius:10px;font-weight:800;cursor:pointer}.main-primary{background:var(--primary);color:#fff}.main-secondary{background:#edf1f6;color:var(--text)}.main-primary:disabled{opacity:.45;cursor:not-allowed}
+.status{display:none;margin-top:18px;padding:13px 14px;border-radius:10px;font-size:14px;line-height:1.45}.status.show{display:block}.error{background:#fff1f2;color:#9f1239}.success{background:#ecfdf5;color:#065f46}.working{background:#f1f5f9;color:#334155}
+.result{display:none;margin-top:20px;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:14px;padding:18px}.result.show{display:block}.result-title{font-weight:850}.result-info{margin-top:7px;color:#475569;font-size:14px}.download{display:inline-block;margin-top:13px;background:var(--primary);color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:750}
+.warning{margin-top:12px;font-size:12px;color:#92400e;background:#fffbeb;padding:10px;border-radius:9px}.privacy{margin-top:20px;padding-top:16px;border-top:1px solid #edf0f5;color:var(--muted);font-size:13px;line-height:1.55}
+@media(max-width:650px){.wrap{padding:13px 9px 40px}.card{padding:18px}h1{font-size:25px}.row{grid-template-columns:1fr}.preview{min-height:250px}}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+<h1>📸 Passport Photo Maker</h1>
+<p class="sub">Create a passport-size photo quickly — normal editing or optional AI enhancement.</p>
+
+<div class="upload" id="uploadArea">
+  <div class="upload-icon">📷</div>
+  <strong>Upload your photo</strong>
+  <div style="color:#64748b;margin-top:6px">JPG, JPEG, PNG or WebP • Maximum 10 MB</div>
+  <button class="choose" id="chooseButton" type="button">Choose Photo</button>
+  <input id="fileInput" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp">
+  <div class="file" id="fileName"></div>
+</div>
+
+<div class="editor" id="editor">
+  <div class="preview"><img id="previewImage" alt="Photo preview"></div>
+
+  <div class="toolbar">
+    <button class="tool" id="undoButton" type="button" disabled>↶ Undo</button>
+    <button class="tool" id="redoButton" type="button" disabled>↷ Redo</button>
+    <button class="tool" id="resetButton" type="button">↻ Reset to Default</button>
+    <button class="tool" id="rotateLeft" type="button">↺ Rotate</button>
+    <button class="tool" id="rotateRight" type="button">↻ Rotate</button>
+    <button class="tool" id="autoAdjust" type="button">Auto Adjust</button>
+  </div>
+
+  <div class="ai-box">
+    <div class="ai-title">✨ Optional AI Tools</div>
+    <div class="ai-buttons">
+      <button class="ai" id="aiEnhance" type="button">✨ AI Auto Enhance</button>
+      <button class="ai ai-dress" id="aiWhite" type="button">White Shirt</button>
+      <button class="ai ai-dress" id="aiFormal" type="button">Formal Shirt</button>
+      <button class="ai ai-dress" type="button" id="aiSuit">Suit</button>
+      <button class="ai ai-dress" type="button" id="aiTie">Suit + Tie</button>
+    </div>
+    <div class="ai-limit" id="aiLimit">Checking today's AI availability…</div>
+    <div class="warning">AI editing can change facial or clothing details. Always verify the final photo before using it for a government, passport or exam application.</div>
+  </div>
+
+  <div class="simple">
+    <div class="row">
+      <div class="field"><label for="photoSize">Passport Photo Size</label>
+        <select id="photoSize">
+          <option value="35x45">35 × 45 mm</option>
+          <option value="2x2">2 × 2 inch</option>
+          <option value="40x50">40 × 50 mm</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div class="field"><label for="targetKB">Target File Size (KB) — optional</label>
+        <input id="targetKB" type="number" min="5" max="2048" placeholder="e.g. 80">
+      </div>
+    </div>
+    <div class="row" id="customSize" style="display:none">
+      <div class="field"><label for="customW">Width (mm)</label><input id="customW" type="number" min="10" max="200" value="35"></div>
+      <div class="field"><label for="customH">Height (mm)</label><input id="customH" type="number" min="10" max="200" value="45"></div>
+    </div>
+  </div>
+
+  <button class="advanced-toggle" id="advancedToggle" type="button">
+    <span>Advanced Crop & Edit</span><span id="advancedArrow">⌄</span>
+  </button>
+
+  <div class="advanced" id="advanced">
+    <div class="crop-box">
+      <div class="crop-title">✂️ Passport Crop & Position</div>
+      <div class="crop-help">Crop is locked to the selected passport ratio. Use Zoom and position sliders to place the face exactly where you want it.</div>
+      <div class="row">
+        <div class="field"><label for="cropZoom">Crop Zoom <span class="range-value" id="cropZoomValue">100%</span></label><input id="cropZoom" type="range" min="100" max="250" value="100"></div>
+        <div class="field"><label for="cropX">Horizontal Position <span class="range-value" id="cropXValue">0</span></label><input id="cropX" type="range" min="-100" max="100" value="0"></div>
+        <div class="field"><label for="cropY">Vertical Position <span class="range-value" id="cropYValue">0</span></label><input id="cropY" type="range" min="-100" max="100" value="0"></div>
+      </div>
+      <div class="crop-actions">
+        <button id="autoFaceCrop" type="button">🎯 Auto Face Crop</button>
+        <button id="resetCrop" type="button">Reset Crop</button>
+      </div>
+    </div>
+    <div class="hd-box">
+      <label><input id="hdQuality" type="checkbox"> <span>✨ HD Quality <small>(2× output resolution + smart sharpening)</small></span></label>
+      <div class="hd-note">Best for clear printing. If a very small Target KB is selected, compression may reduce the final resolution.</div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="brightness">Brightness <span class="range-value" id="brightnessValue">0</span></label><input id="brightness" type="range" min="-50" max="50" value="0"></div>
+      <div class="field"><label for="contrast">Contrast <span class="range-value" id="contrastValue">0</span></label><input id="contrast" type="range" min="-50" max="50" value="0"></div>
+      <div class="field"><label for="saturation">Color <span class="range-value" id="saturationValue">0</span></label><input id="saturation" type="range" min="-50" max="50" value="0"></div>
+      <div class="field"><label for="sharpness">Sharpness <span class="range-value" id="sharpnessValue">0</span></label><input id="sharpness" type="range" min="0" max="100" value="0"></div>
+    </div>
+    <div class="advanced-actions">
+      <button class="reset" id="resetAdvanced" type="button">Reset Advanced Settings</button>
+      <button class="process" id="processButton" type="button">Create Passport Photo</button>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="main-btn main-primary" id="quickProcess" type="button">Create Passport Photo</button>
+    <button class="main-btn main-secondary" id="chooseAnother" type="button">Choose Another</button>
+  </div>
+</div>
+
+<div class="status" id="status"></div>
+<div class="result" id="result">
+  <div class="result-title">Passport photo ready ✅</div>
+  <div class="result-info" id="resultInfo"></div>
+  <a class="download" id="downloadButton" href="#" download="passport-photo.jpg">Download Photo</a>
+</div>
+<div class="privacy">🔒 <strong>Private:</strong> normal editing happens in your browser. AI requests are sent only to the site's protected AI endpoint and are subject to the free AI limit.</div>
+</div></div>
+
+<script src="/tools/passport-photo-test/app.js"></script>
+</body>
+</html>

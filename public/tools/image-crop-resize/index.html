@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Image Crop & Resize Online | Free Tool</title>
+
+  <meta
+    name="description"
+    content="Free online image crop and resize tool. Crop JPG, JPEG, PNG and WebP images, resize to exact dimensions, choose aspect ratios and download your image."
+  >
+
+  <meta name="theme-color" content="#2563eb">
+
+  <link rel="stylesheet" href="/css/style.css">
+
+  <style>
+    .tool-hero {
+      padding: 55px 0 40px;
+      background:
+        radial-gradient(circle at top right, #dbeafe 0, transparent 38%),
+        linear-gradient(135deg, #f8fbff 0%, #eff6ff 100%);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .breadcrumb {
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .breadcrumb a {
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .tool-hero h1 {
+      margin-top: 8px;
+      font-size: clamp(34px, 5vw, 52px);
+      line-height: 1.1;
+      letter-spacing: -0.04em;
+    }
+
+    .tool-hero h1 span {
+      color: var(--primary);
+    }
+
+    .tool-hero p {
+      max-width: 720px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .tool-workspace {
+      padding: 45px 0 70px;
+      background: var(--background);
+    }
+
+    .tool-panel {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .upload-area {
+      margin: 28px;
+      padding: 55px 25px;
+      border: 2px dashed #bfdbfe;
+      border-radius: 16px;
+      background: #f8fbff;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    .upload-area:hover,
+    .upload-area.dragover {
+      border-color: var(--primary);
+      background: var(--hero);
+    }
+
+    .upload-icon {
+      width: 65px;
+      height: 65px;
+      margin: 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      background: var(--hero);
+      font-size: 30px;
+    }
+
+    .upload-area h2 {
+      margin-top: 16px;
+      font-size: 22px;
+    }
+
+    .upload-area p {
+      margin-top: 6px;
+      color: var(--muted);
+    }
+
+    .browse-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      margin-top: 20px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 9px;
+      background: var(--primary);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .file-types {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    .editor {
+      display: none;
+      padding: 28px;
+    }
+
+    .editor.visible {
+      display: block;
+    }
+
+    .editor-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 24px;
+    }
+
+    .preview-panel {
+      min-height: 450px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #f1f5f9;
+      overflow: hidden;
+    }
+
+    .preview-wrapper {
+      position: relative;
+      max-width: 100%;
+      max-height: 620px;
+      overflow: hidden;
+      line-height: 0;
+    }
+
+    #imagePreview {
+      display: block;
+      max-width: 100%;
+      max-height: 620px;
+      object-fit: contain;
+    }
+
+    .controls {
+      padding: 22px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: white;
+    }
+
+    .control-group {
+      margin-bottom: 22px;
+    }
+
+    .control-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .control-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .ratio-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+    }
+
+    .ratio-button {
+      min-height: 38px;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: white;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .ratio-button:hover,
+    .ratio-button.active {
+      border-color: var(--primary);
+      background: var(--hero);
+      color: var(--primary);
+    }
+
+    .dimension-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .field label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      height: 40px;
+      margin-top: 5px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      outline: none;
+      background: white;
+    }
+
+    .field input:focus,
+    .field select:focus {
+      border-color: var(--primary);
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 9px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .checkbox-row input {
+      width: 16px;
+      height: 16px;
+    }
+
+    .quality-value {
+      float: right;
+      color: var(--primary);
+    }
+
+    #qualityRange {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      margin-top: 24px;
+    }
+
+    .action-button {
+      min-height: 43px;
+      border: 0;
+      border-radius: 9px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .primary-action {
+      background: var(--primary);
+      color: white;
+    }
+
+    .secondary-action {
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .result {
+      display: none;
+      margin-top: 24px;
+      padding: 22px;
+      border: 1px solid #bbf7d0;
+      border-radius: 14px;
+      background: #f0fdf4;
+    }
+
+    .result.visible {
+      display: block;
+    }
+
+    .result h3 {
+      font-size: 18px;
+    }
+
+    .result p {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .download-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 43px;
+      margin-top: 15px;
+      padding: 0 18px;
+      border-radius: 9px;
+      background: var(--success);
+      color: white;
+      font-weight: 800;
+    }
+
+    .privacy-box {
+      margin-top: 24px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: white;
+    }
+
+    .privacy-box strong {
+      font-size: 15px;
+    }
+
+    .privacy-box p {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .error-message {
+      display: none;
+      margin: 20px 28px 0;
+      padding: 13px 15px;
+      border: 1px solid #fecaca;
+      border-radius: 9px;
+      background: #fef2f2;
+      color: #b91c1c;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .error-message.visible {
+      display: block;
+    }
+
+    .file-info {
+      display: none;
+      margin: 0 28px 20px;
+      padding: 12px 14px;
+      border-radius: 9px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .file-info.visible {
+      display: block;
+    }
+
+    @media (max-width: 900px) {
+      .editor-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .preview-panel {
+        min-height: 350px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .tool-hero {
+        padding: 42px 0 32px;
+      }
+
+      .tool-hero h1 {
+        font-size: 36px;
+      }
+
+      .tool-hero p {
+        font-size: 15px;
+      }
+
+      .upload-area {
+        margin: 18px;
+        padding: 42px 18px;
+      }
+
+      .editor {
+        padding: 18px;
+      }
+
+      .preview-panel {
+        min-height: 280px;
+        padding: 12px;
+      }
+
+      .controls {
+        padding: 17px;
+      }
+
+      .action-buttons {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+
+      <a href="/" class="brand">
+        <span class="brand-icon">📄</span>
+
+        <span>
+          <strong>Free PDF Forms</strong>
+          <small>Government Resources</small>
+        </span>
+      </a>
+
+      <nav class="main-nav">
+        <a href="/">Home</a>
+        <a href="/#departments">PDF Forms</a>
+        <a href="/#government-links">Government Resources</a>
+        <a href="/tools" class="active">Online Tools</a>
+      </nav>
+
+    </div>
+  </header>
+
+
+  <main>
+
+    <!-- Tool Hero -->
+    <section class="tool-hero">
+      <div class="container">
+
+        <div class="breadcrumb">
+          <a href="/">Home</a>
+          <span> / </span>
+          <a href="/tools">Online Tools</a>
+          <span> / Image Crop & Resize</span>
+        </div>
+
+        <span class="section-label">IMAGE TOOL</span>
+
+        <h1>
+          Image Crop &
+          <span>Resize</span>
+        </h1>
+
+        <p>
+          Crop and resize JPG, JPEG, PNG and WebP images.
+          Choose an aspect ratio, set exact dimensions and
+          download your processed image.
+        </p>
+
+      </div>
+    </section>
+
+
+    <!-- Tool Workspace -->
+    <section class="tool-workspace">
+
+      <div class="container">
+
+        <div class="tool-panel">
+
+          <!-- Upload -->
+          <div
+            id="uploadArea"
+            class="upload-area"
+            role="button"
+            tabindex="0"
+            aria-label="Upload image"
+          >
+
+            <div class="upload-icon">🖼️</div>
+
+            <h2>Drop your image here</h2>
+
+            <p>
+              or choose an image from your device
+            </p>
+
+            <button
+              id="browseButton"
+              class="browse-button"
+              type="button"
+            >
+              Choose Image
+            </button>
+
+            <div class="file-types">
+              JPG • JPEG • PNG • WebP
+            </div>
+
+            <input
+              id="fileInput"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+            >
+
+          </div>
+
+
+          <!-- Error -->
+          <div
+            id="errorMessage"
+            class="error-message"
+            role="alert"
+          ></div>
+
+
+          <!-- File Info -->
+          <div id="fileInfo" class="file-info"></div>
+
+
+          <!-- Editor -->
+          <div id="editor" class="editor">
+
+            <div class="editor-layout">
+
+              <!-- Preview -->
+              <div class="preview-panel">
+
+                <div class="preview-wrapper">
+                  <img
+                    id="imagePreview"
+                    src=""
+                    alt="Image preview"
+                  >
+                </div>
+
+              </div>
+
+
+              <!-- Controls -->
+              <div class="controls">
+
+                <!-- Aspect Ratio -->
+                <div class="control-group">
+
+                  <label>
+                    Aspect Ratio
+                  </label>
+
+                  <div class="ratio-buttons">
+
+                    <button
+                      type="button"
+                      class="ratio-button active"
+                      data-ratio="free"
+                    >
+                      Free
+                    </button>
+
+                    <button
+                      type="button"
+                      class="ratio-button"
+                      data-ratio="1:1"
+                    >
+                      1:1
+                    </button>
+
+                    <button
+                      type="button"
+                      class="ratio-button"
+                      data-ratio="4:3"
+                    >
+                      4:3
+                    </button>
+
+                    <button
+                      type="button"
+                      class="ratio-button"
+                      data-ratio="3:4"
+                    >
+                      3:4
+                    </button>
+
+                    <button
+                      type="button"
+                      class="ratio-button"
+                      data-ratio="16:9"
+                    >
+                      16:9
+                    </button>
+
+                    <button
+                      type="button"
+                      class="ratio-button"
+                      data-ratio="9:16"
+                    >
+                      9:16
+                    </button>
+
+                    <button
+                      type="button"
+                      class="ratio-button"
+                      data-ratio="custom"
+                    >
+                      Custom
+                    </button>
+
+                  </div>
+
+                </div>
+
+
+                <!-- Custom Ratio -->
+                <div
+                  id="customRatioGroup"
+                  class="control-group"
+                  style="display:none;"
+                >
+
+                  <label>
+                    Custom Ratio
+                  </label>
+
+                  <div class="dimension-row">
+
+                    <div class="field">
+                      <label for="ratioWidth">
+                        Width
+                      </label>
+
+                      <input
+                        id="ratioWidth"
+                        type="number"
+                        min="1"
+                        value="1"
+                      >
+                    </div>
+
+                    <div class="field">
+                      <label for="ratioHeight">
+                        Height
+                      </label>
+
+                      <input
+                        id="ratioHeight"
+                        type="number"
+                        min="1"
+                        value="1"
+                      >
+                    </div>
+
+                  </div>
+
+                </div>
+
+
+                <!-- Dimensions -->
+                <div class="control-group">
+
+                  <label>
+                    Output Dimensions
+                  </label>
+
+                  <div class="dimension-row">
+
+                    <div class="field">
+                      <label for="outputWidth">
+                        Width (px)
+                      </label>
+
+                      <input
+                        id="outputWidth"
+                        type="number"
+                        min="1"
+                        value="1200"
+                      >
+                    </div>
+
+                    <div class="field">
+                      <label for="outputHeight">
+                        Height (px)
+                      </label>
+
+                      <input
+                        id="outputHeight"
+                        type="number"
+                        min="1"
+                        value="800"
+                      >
+                    </div>
+
+                  </div>
+
+                  <label class="checkbox-row">
+                    <input
+                      id="lockAspect"
+                      type="checkbox"
+                      checked
+                    >
+                    Lock aspect ratio
+                  </label>
+
+                </div>
+
+
+                <!-- Output Format -->
+                <div class="control-group">
+
+                  <label for="outputFormat">
+                    Output Format
+                  </label>
+
+                  <div class="field">
+
+                    <select id="outputFormat">
+                      <option value="image/jpeg">JPG</option>
+                      <option value="image/png">PNG</option>
+                      <option value="image/webp">WebP</option>
+                    </select>
+
+                  </div>
+
+                </div>
+
+
+                <!-- Quality -->
+                <div class="control-group">
+
+                  <label for="qualityRange">
+                    Quality
+                    <span
+                      id="qualityValue"
+                      class="quality-value"
+                    >
+                      90%
+                    </span>
+                  </label>
+
+                  <input
+                    id="qualityRange"
+                    type="range"
+                    min="10"
+                    max="100"
+                    value="90"
+                  >
+
+                </div>
+
+
+                <!-- Actions -->
+                <div class="action-buttons">
+
+                  <button
+                    id="processButton"
+                    class="action-button primary-action"
+                    type="button"
+                  >
+                    Process Image
+                  </button>
+
+                  <button
+                    id="resetButton"
+                    class="action-button secondary-action"
+                    type="button"
+                  >
+                    Choose Another
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
+
+
+            <!-- Result -->
+            <div id="result" class="result">
+
+              <h3>✅ Image Ready</h3>
+
+              <p id="resultInfo">
+                Your processed image is ready.
+              </p>
+
+              <a
+                id="downloadButton"
+                class="download-button"
+                href="#"
+                download="processed-image.jpg"
+              >
+                Download Image
+              </a>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- Privacy -->
+        <div class="privacy-box">
+
+          <strong>🔒 Your image stays on your device</strong>
+
+          <p>
+            Image processing is performed directly in your
+            browser. Your image is not permanently uploaded
+            or stored on our server.
+          </p>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <!-- Footer -->
+  <footer class="site-footer">
+
+    <div class="container footer-inner">
+
+      <div>
+        <strong>
+          Free PDF Forms & Government Resources
+        </strong>
+
+        <p>
+          Free access to useful forms, resources and online tools.
+        </p>
+      </div>
+
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="/tools">Online Tools</a>
+      </div>
+
+    </div>
+
+    <div class="container footer-bottom">
+
+      <p>
+        © <span id="currentYear"></span>
+        Free PDF Forms. All rights reserved.
+      </p>
+
+    </div>
+
+  </footer>
+
+
+  <script src="/tools/image-crop-resize/app.js"></script>
+
+</body>
+</html>

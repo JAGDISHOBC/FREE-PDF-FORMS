@@ -1,18 +1,21 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-
   "name": "free-pdf-forms",
-
   "main": "src/worker.js",
-
   "compatibility_date": "2026-08-31",
-
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "not_found_handling": "404-page"
+    "not_found_handling": "404-page",
+    "run_worker_first": [
+      "/api/*",
+      "/pdf/*",
+      "/download/*"
+    ]
   },
-
+  "ai": {
+    "binding": "AI"
+  },
   "d1_databases": [
     {
       "binding": "DB",
@@ -20,7 +23,6 @@
       "database_id": "f3620f29-f146-4913-b5dd-ac5bd13081d0"
     }
   ],
-
   "r2_buckets": [
     {
       "binding": "PDF_BUCKET",

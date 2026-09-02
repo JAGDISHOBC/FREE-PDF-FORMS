@@ -1,12 +1,293 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Free PDF Forms & Government Resources</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Free PDF Forms & Government Resources</title>
+
+  <meta
+    name="description"
+    content="Free PDF forms, government resources and useful online tools. Find and download forms easily."
+  >
+
+  <meta name="theme-color" content="#2563eb">
+
+  <link rel="stylesheet" href="/css/style.css">
 </head>
+
 <body>
-    <h1>Free PDF Forms & Government Resources</h1>
-    <p>Website is under construction.</p>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+
+      <a href="/" class="brand">
+        <span class="brand-icon">📄</span>
+        <span>
+          <strong>Free PDF Forms</strong>
+          <small>Government Resources</small>
+        </span>
+      </a>
+
+      <nav class="main-nav">
+        <a href="/" class="active">Home</a>
+        <a href="#departments">PDF Forms</a>
+        <a href="#government-links">Government Resources</a>
+        <a href="/tools">Online Tools</a>
+      </nav>
+
+    </div>
+  </header>
+
+
+  <main>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container hero-content">
+
+        <div class="hero-text">
+          <span class="eyebrow">FREE • SIMPLE • EASY</span>
+
+          <h1>
+            Free PDF Forms &<br>
+            <span>Government Resources</span>
+          </h1>
+
+          <p>
+            Find useful government forms, documents and online tools
+            in one simple place.
+          </p>
+
+          <div class="hero-actions">
+            <a href="#departments" class="btn btn-primary">
+              Browse PDF Forms
+            </a>
+
+            <a href="/tools" class="btn btn-secondary">
+              Explore Online Tools
+            </a>
+          </div>
+        </div>
+
+        <div class="hero-card">
+          <div class="hero-card-icon">🔎</div>
+          <h2>Find a Form</h2>
+          <p>Search by form name or department.</p>
+
+          <div class="search-box">
+            <input
+              id="searchInput"
+              type="search"
+              placeholder="Search forms..."
+              autocomplete="off"
+            >
+            <button id="searchButton" type="button">
+              Search
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- Departments -->
+    <section id="departments" class="section">
+      <div class="container">
+
+        <div class="section-heading">
+          <div>
+            <span class="section-label">PDF FORMS</span>
+            <h2>Browse by Department</h2>
+            <p>
+              Find forms according to the department or office.
+            </p>
+          </div>
+        </div>
+
+        <div id="departmentsGrid" class="department-grid">
+
+          <div class="loading-card">
+            Loading departments...
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- Forms -->
+    <section id="forms" class="section section-alt">
+      <div class="container">
+
+        <div class="section-heading">
+          <div>
+            <span class="section-label">AVAILABLE FORMS</span>
+            <h2>PDF Forms</h2>
+            <p id="formsDescription">
+              Download useful PDF forms easily.
+            </p>
+          </div>
+        </div>
+
+        <div id="formsGrid" class="forms-grid">
+
+          <div class="empty-card">
+            <div class="empty-icon">📄</div>
+            <h3>No forms available yet</h3>
+            <p>
+              Forms added from the admin panel will appear here.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- Online Tools -->
+    <section id="tools" class="section tools-section">
+      <div class="container">
+
+        <div class="section-heading">
+          <div>
+            <span class="section-label">ONLINE TOOLS</span>
+            <h2>Free Online Tools</h2>
+            <p>
+              Useful tools for images and PDF files.
+            </p>
+          </div>
+
+          <a href="/tools" class="view-all">
+            View All Tools →
+          </a>
+        </div>
+
+
+        <div class="tools-grid">
+
+          <a href="/tools/image-crop-resize" class="tool-card">
+            <div class="tool-icon">✂️</div>
+            <h3>Image Crop & Resize</h3>
+            <p>
+              Crop and resize JPG, PNG and WebP images.
+            </p>
+            <span>Use Tool →</span>
+          </a>
+
+
+          <a href="/tools/pdf-compressor" class="tool-card">
+            <div class="tool-icon">📦</div>
+            <h3>PDF Compressor</h3>
+            <p>
+              Reduce PDF file size while maintaining quality.
+            </p>
+            <span>Use Tool →</span>
+          </a>
+
+
+          <a href="/tools/jpg-png-to-pdf" class="tool-card">
+            <div class="tool-icon">🖼️</div>
+            <h3>JPG/PNG to PDF</h3>
+            <p>
+              Convert multiple images into a single PDF.
+            </p>
+            <span>Use Tool →</span>
+          </a>
+
+
+          <a href="/tools/passport-photo-maker" class="tool-card">
+            <div class="tool-icon">👤</div>
+            <h3>Passport Photo Maker</h3>
+            <p>
+              Create printable passport photo sheets.
+            </p>
+            <span>Use Tool →</span>
+          </a>
+
+
+          <a href="/tools/merge-pdf" class="tool-card">
+            <div class="tool-icon">🔗</div>
+            <h3>Merge PDF</h3>
+            <p>
+              Combine multiple PDF files into one document.
+            </p>
+            <span>Use Tool →</span>
+          </a>
+
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- Government Resources -->
+    <section id="government-links" class="section section-alt">
+      <div class="container">
+
+        <div class="section-heading">
+          <div>
+            <span class="section-label">GOVERNMENT RESOURCES</span>
+            <h2>Useful Government Links</h2>
+            <p>
+              Important government websites and resources.
+            </p>
+          </div>
+        </div>
+
+        <div id="linksGrid" class="links-grid">
+
+          <div class="empty-card">
+            <div class="empty-icon">🔗</div>
+            <h3>No links available yet</h3>
+            <p>
+              Government links added from the admin panel will appear here.
+            </p>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+
+      <div>
+        <strong id="footerTitle">
+          Free PDF Forms & Government Resources
+        </strong>
+
+        <p id="footerSubtitle">
+          Free access to useful forms and resources.
+        </p>
+      </div>
+
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="/tools">Online Tools</a>
+      </div>
+
+    </div>
+
+    <div class="container footer-bottom">
+      <p>
+        © <span id="currentYear"></span>
+        Free PDF Forms. All rights reserved.
+      </p>
+    </div>
+  </footer>
+
+
+  <script src="/js/app.js"></script>
+
 </body>
 </html>

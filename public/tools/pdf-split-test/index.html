@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Split PDF - Free Online PDF Tool</title>
+<meta name="description" content="Split a PDF into separate PDF files by page ranges.">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f5f7fb;color:#172033}
+.container{width:min(1050px,calc(100% - 32px));margin:auto}header{text-align:center;padding:34px 0 22px}
+.badge{display:inline-block;padding:7px 13px;border-radius:999px;background:#e9eefc;font-size:13px;font-weight:700;margin-bottom:12px}
+h1{margin:0;font-size:clamp(28px,5vw,44px)}.subtitle{max-width:700px;margin:12px auto;color:#5e687b;line-height:1.6}
+.card{background:#fff;border:1px solid #e1e6ef;border-radius:18px;padding:24px;box-shadow:0 8px 30px rgba(30,45,70,.06)}
+.upload-area{border:2px dashed #b9c3d6;border-radius:16px;padding:45px 20px;text-align:center;cursor:pointer}
+.upload-area:hover,.upload-area.dragover{border-color:#526dff;background:#f7f8ff}.upload-icon{font-size:48px}
+.upload-area h2{margin:10px 0 8px}.upload-area p{color:#6c7585;margin:0 0 20px}
+.button{border:0;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:700;cursor:pointer}
+.button:disabled{opacity:.55;cursor:not-allowed}.primary{background:#315efb;color:#fff}.secondary{background:#eef2f7;color:#202b3d}.danger{background:#fff0f0;color:#b42318}
+#fileInput{display:none}.hidden{display:none!important}
+.file-info{margin-top:20px;padding:15px;background:#f7f9fc;border-radius:12px;display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.section{margin-top:24px}.section h2{margin:0 0 8px}.help{color:#697386;line-height:1.5}
+.range-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:15px}
+.range-row input{flex:1;min-width:220px;padding:12px;border:1px solid #ccd4e1;border-radius:10px;font-size:15px}
+.parts{display:grid;gap:12px;margin-top:18px}.part{border:1px solid #e0e5ee;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.part input{width:90px;padding:10px;border:1px solid #ccd4e1;border-radius:8px}.part-name{font-weight:700;flex:1}
+.status{margin-top:18px;padding:14px;border-radius:10px;background:#f1f6ff;color:#274a9b;line-height:1.5}
+.success{background:#eefaf2;color:#176b36}.error{background:#fff1f0;color:#b42318}
+.result{margin-top:24px}.result h2{text-align:center}.file-list{display:grid;gap:10px;margin:18px 0}
+.file-item{padding:14px;background:#f7f9fc;border:1px solid #e0e5ee;border-radius:10px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.filename{max-width:520px;margin:20px auto;text-align:left}.filename label{display:block;margin-bottom:7px;font-weight:700}
+.filename-row{display:flex;border:1px solid #ccd4e1;border-radius:10px;overflow:hidden}.filename-row input{flex:1;border:0;padding:12px;outline:0;font-size:15px}.extension{padding:12px;background:#f2f4f7;color:#626c7d;font-weight:700}
+.privacy{text-align:center;color:#697386;font-size:13px;margin:20px 0 30px}
+@media(max-width:650px){.card{padding:16px}.file-item{align-items:flex-start;flex-direction:column}}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+</head>
+<body>
+<header><div class="container"><div class="badge">FREE PDF TOOL</div><h1>Split PDF</h1>
+<p class="subtitle">Split your PDF into separate files using page ranges. Your original PDF stays unchanged.</p></div></header>
+<main class="container"><section class="card">
+<div id="uploadArea" class="upload-area"><div class="upload-icon">📄</div><h2>Drop your PDF here</h2><p>or choose a PDF from your device</p>
+<button id="browseButton" class="button primary" type="button">Choose PDF</button>
+<input id="fileInput" type="file" accept="application/pdf,.pdf"></div>
+
+<div id="fileInfo" class="file-info hidden"><div><strong id="fileName"></strong><div id="fileMeta"></div></div>
+<button id="changeFileButton" class="button secondary" type="button">Choose Another</button></div>
+
+<div id="editor" class="hidden">
+<div class="section"><h2>Split by page ranges</h2>
+<div class="help">Examples: <b>1-3,4-6</b> creates two PDFs. <b>1,3,5-7</b> creates one PDF containing pages 1, 3 and 5–7.</div>
+<div class="range-row"><input id="rangeInput" type="text" placeholder="e.g. 1-3,4-6"><button id="applyRange" class="button secondary" type="button">Preview Parts</button></div>
+<div id="parts" class="parts"></div>
+</div>
+<div id="status" class="status hidden"></div>
+<div style="margin-top:24px;text-align:center"><button id="processButton" class="button primary" type="button">Split PDF</button>
+<button id="resetButton" class="button danger" type="button" style="margin-left:8px">Start Over</button></div>
+</div>
+
+<div id="result" class="result hidden"><h2>✓ PDF Split Successfully</h2>
+<div id="resultSummary" style="text-align:center;color:#5d687a"></div><div id="fileList" class="file-list"></div>
+<div class="filename"><label for="prefixInput">File name prefix</label><div class="filename-row"><input id="prefixInput" type="text" value="Split_PDF"><span class="extension">.pdf files</span></div></div>
+<button id="downloadAllButton" class="button primary" type="button">⬇ Download All PDFs</button>
+<button id="anotherButton" class="button secondary" type="button" style="margin-left:8px">Test Another PDF</button>
+</div>
+</section><div class="privacy">🔒 Your PDF is processed locally in your browser.</div></main>
+<script src="/tools/pdf-split-test/app.js"></script>
+</body></html>
