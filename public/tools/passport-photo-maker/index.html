@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -36,13 +36,13 @@ input[type=range]{width:100%}
 </head>
 <body>
 <div class="wrap"><div class="card">
-<h1>ðŸ“¸ Passport Photo Maker</h1>
-<p class="sub">Create a passport-size photo quickly â€” normal editing or optional AI enhancement.</p>
+<h1>📸 Passport Photo Maker</h1>
+<p class="sub">Create a passport-size photo quickly — normal editing or optional AI enhancement.</p>
 
 <div class="upload" id="uploadArea">
-  <div class="upload-icon">ðŸ“·</div>
+  <div class="upload-icon">📷</div>
   <strong>Upload your photo</strong>
-  <div style="color:#64748b;margin-top:6px">JPG, JPEG, PNG or WebP â€¢ Maximum 10 MB</div>
+  <div style="color:#64748b;margin-top:6px">JPG, JPEG, PNG or WebP • Maximum 10 MB</div>
   <button class="choose" id="chooseButton" type="button">Choose Photo</button>
   <input id="fileInput" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp">
   <div class="file" id="fileName"></div>
@@ -52,24 +52,24 @@ input[type=range]{width:100%}
   <div class="preview"><img id="previewImage" alt="Photo preview"></div>
 
   <div class="toolbar">
-    <button class="tool" id="undoButton" type="button" disabled>â†¶ Undo</button>
-    <button class="tool" id="redoButton" type="button" disabled>â†· Redo</button>
-    <button class="tool" id="resetButton" type="button">â†» Reset to Default</button>
-    <button class="tool" id="rotateLeft" type="button">â†º Rotate</button>
-    <button class="tool" id="rotateRight" type="button">â†» Rotate</button>
+    <button class="tool" id="undoButton" type="button" disabled>↶ Undo</button>
+    <button class="tool" id="redoButton" type="button" disabled>↷ Redo</button>
+    <button class="tool" id="resetButton" type="button">↻ Reset to Default</button>
+    <button class="tool" id="rotateLeft" type="button">↺ Rotate</button>
+    <button class="tool" id="rotateRight" type="button">↻ Rotate</button>
     <button class="tool" id="autoAdjust" type="button">Auto Adjust</button>
   </div>
 
   <div class="ai-box">
-    <div class="ai-title">âœ¨ Optional AI Tools</div>
+    <div class="ai-title">✨ Optional AI Tools</div>
     <div class="ai-buttons">
-      <button class="ai" id="aiEnhance" type="button">âœ¨ AI Auto Enhance</button>
+      <button class="ai" id="aiEnhance" type="button">✨ AI Auto Enhance</button>
       <button class="ai ai-dress" id="aiWhite" type="button">White Shirt</button>
       <button class="ai ai-dress" id="aiFormal" type="button">Formal Shirt</button>
       <button class="ai ai-dress" type="button" id="aiSuit">Suit</button>
       <button class="ai ai-dress" type="button" id="aiTie">Suit + Tie</button>
     </div>
-    <div class="ai-limit" id="aiLimit">Checking today's AI availabilityâ€¦</div>
+    <div class="ai-limit" id="aiLimit">Checking today's AI availability…</div>
     <div class="warning">AI editing can change facial or clothing details. Always verify the final photo before using it for a government, passport or exam application.</div>
   </div>
 
@@ -83,7 +83,7 @@ input[type=range]{width:100%}
           <option value="custom">Custom</option>
         </select>
       </div>
-      <div class="field"><label for="targetKB">Target File Size (KB) â€” optional</label>
+      <div class="field"><label for="targetKB">Target File Size (KB) — optional</label>
         <input id="targetKB" type="number" min="5" max="2048" placeholder="e.g. 80">
       </div>
     </div>
@@ -94,12 +94,12 @@ input[type=range]{width:100%}
   </div>
 
   <button class="advanced-toggle" id="advancedToggle" type="button">
-    <span>Advanced Crop & Edit</span><span id="advancedArrow">âŒ„</span>
+    <span>Advanced Crop & Edit</span><span id="advancedArrow">⌄</span>
   </button>
 
   <div class="advanced" id="advanced">
     <div class="crop-box">
-      <div class="crop-title">âœ‚ï¸ Passport Crop & Position</div>
+      <div class="crop-title">✂️ Passport Crop & Position</div>
       <div class="crop-help">Crop is locked to the selected passport ratio. Use Zoom and position sliders to place the face exactly where you want it.</div>
       <div class="row">
         <div class="field"><label for="cropZoom">Crop Zoom <span class="range-value" id="cropZoomValue">100%</span></label><input id="cropZoom" type="range" min="100" max="250" value="100"></div>
@@ -107,12 +107,12 @@ input[type=range]{width:100%}
         <div class="field"><label for="cropY">Vertical Position <span class="range-value" id="cropYValue">0</span></label><input id="cropY" type="range" min="-100" max="100" value="0"></div>
       </div>
       <div class="crop-actions">
-        <button id="autoFaceCrop" type="button">ðŸŽ¯ Auto Face Crop</button>
+        <button id="autoFaceCrop" type="button">🎯 Auto Face Crop</button>
         <button id="resetCrop" type="button">Reset Crop</button>
       </div>
     </div>
     <div class="hd-box">
-      <label><input id="hdQuality" type="checkbox"> <span>âœ¨ HD Quality <small>(2Ã— output resolution + smart sharpening)</small></span></label>
+      <label><input id="hdQuality" type="checkbox"> <span>✨ HD Quality <small>(2× output resolution + smart sharpening)</small></span></label>
       <div class="hd-note">Best for clear printing. If a very small Target KB is selected, compression may reduce the final resolution.</div>
     </div>
     <div class="row">
@@ -135,11 +135,11 @@ input[type=range]{width:100%}
 
 <div class="status" id="status"></div>
 <div class="result" id="result">
-  <div class="result-title">Passport photo ready âœ…</div>
+  <div class="result-title">Passport photo ready ✅</div>
   <div class="result-info" id="resultInfo"></div>
   <a class="download" id="downloadButton" href="#" download="passport-photo.jpg">Download Photo</a>
 </div>
-<div class="privacy">ðŸ”’ <strong>Private:</strong> normal editing happens in your browser. AI requests are sent only to the site's protected AI endpoint and are subject to the free AI limit.</div>
+<div class="privacy">🔒 <strong>Private:</strong> normal editing happens in your browser. AI requests are sent only to the site's protected AI endpoint and are subject to the free AI limit.</div>
 </div></div>
 
 <script src="/tools/passport-photo-maker/app.js"></script>
