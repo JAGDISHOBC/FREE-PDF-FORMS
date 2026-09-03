@@ -12,10 +12,8 @@
       "/pdf/*",
       "/download/*",
       "/admin",
-      "/admin/",
-      "/admin/login",
-      "/admin/login/",
-      "/__admin/dashboard.html"
+      "/admin/*",
+      "/tools/*"
     ]
   },
   "ai": {

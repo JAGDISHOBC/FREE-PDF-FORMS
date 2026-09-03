@@ -59,6 +59,8 @@
       $("departmentCount").textContent = result.data.departments;
       $("formCount").textContent = result.data.forms;
       $("linkCount").textContent = result.data.governmentLinks;
+      if ($("toolCount")) $("toolCount").textContent = result.data.tools || 0;
+      await loadTools();
       await loadDepartments();
       await loadForms();
       await loadDepartmentOptions();
@@ -231,7 +233,7 @@
   });
 
   async function refreshAll() {
-    await Promise.all([refreshDashboardCounts(), loadDepartments(), loadForms($("formSearch")?.value.trim() || ""), loadLinks()]);
+    await Promise.all([refreshDashboardCounts(), loadTools(), loadDepartments(), loadForms($("formSearch")?.value.trim() || ""), loadLinks()]);
   }
 
   async function refreshDashboardCounts() {
@@ -239,10 +241,105 @@
     $("departmentCount").textContent = result.data.departments;
     $("formCount").textContent = result.data.forms;
     $("linkCount").textContent = result.data.governmentLinks;
+    if ($("toolCount")) $("toolCount").textContent = result.data.tools || 0;
   }
 
+  async function loadTools() {
+    const body = $("toolsBody"); if (!body) return;
+    try {
+      const search = $("toolSearch")?.value.trim() || "";
+      const query = search ? `?search=${encodeURIComponent(search)}` : "";
+      const result = await api(`/api/admin/tools${query}`);
+      renderTools(result.data.tools || []);
+    } catch (error) {
+      if (error.status === 401) { window.location.href = "/admin/login"; return; }
+      body.innerHTML = `<tr><td colspan="7" class="table-empty">${escapeHtml(error.message || "Unable to load tools.")}</td></tr>`;
+    }
+  }
 
-  async function loadForms(search = "") {
+  function renderTools(tools) {
+    const body = $("toolsBody"); if (!body) return;
+    if (!tools.length) { body.innerHTML = `<tr><td colspan="7" class="table-empty">No tools found.</td></tr>`; return; }
+    body.innerHTML = tools.map((tool) => {
+      const active=Number(tool.is_active)===1, home=Number(tool.show_on_home)===1, featured=Number(tool.is_featured)===1, id=Number(tool.id);
+      return `<tr><td><span class="order-badge">${escapeHtml(tool.sort_order)}</span></td><td><div class="dept-name"><span class="dept-icon">${escapeHtml(tool.icon||"🛠️")}</span><div><strong>${escapeHtml(tool.name)}</strong><div class="muted table-subtext">/${escapeHtml(tool.slug)}</div></div></div></td><td>${escapeHtml(tool.category||"Other")}</td><td><div class="tool-flags"><span class="status-badge ${home?"active":"inactive"}">${home?"Home":"Hidden"}</span><span class="status-badge ${featured?"active":"inactive"}">${featured?"Featured":"Standard"}</span></div></td><td><span class="status-badge ${active?"active":"inactive"}">${active?"Active":"Inactive"}</span></td><td>${escapeHtml(tool.version||"1.0.0")}</td><td class="action-group"><a class="secondary-button mini" href="/tools/${encodeURIComponent(tool.slug)}" target="_blank" rel="noopener">Open</a><button class="secondary-button mini" data-tool-action="edit" data-id="${id}" type="button">Edit</button><button class="secondary-button mini" data-tool-action="toggle" data-id="${id}" type="button">${active?"Disable":"Enable"}</button><button class="danger-button mini" data-tool-action="delete" data-id="${id}" type="button">Delete</button></td></tr>`;
+    }).join("");
+  }
+
+  async function getAdminTool(id) { const result=await api(`/api/admin/tools/${id}`); return result.data; }
+
+  function openToolModal(data=null) {
+    const tool=data?.tool||data, settings=data?.settings||{};
+    $("toolId").value=tool?.id||"";
+    $("toolName").value=tool?.name||"";
+    $("toolSlug").value=tool?.slug||"";
+    $("toolDescription").value=tool?.description||"";
+    $("toolIcon").value=tool?.icon||"🛠️";
+    $("toolCategory").value=tool?.category||"Other";
+    $("toolSort").value=Number(tool?.sort_order||1);
+    $("toolVersion").value=tool?.version||"1.0.0";
+    $("toolActive").checked=tool?Number(tool.is_active)===1:true;
+    $("toolHome").checked=tool?Number(tool.show_on_home)===1:true;
+    $("toolFeatured").checked=tool?Number(tool.is_featured)===1:false;
+    $("toolSettings").value=Object.keys(settings).length?JSON.stringify(settings,null,2):"";
+    $("toolModalTitle").textContent=tool?.id?"Edit Tool":"Add Tool";
+    showMessage($("toolFormMessage"),"");
+    $("toolModal").classList.remove("hidden");
+    $("toolModal").setAttribute("aria-hidden","false");
+    setTimeout(()=>$("toolName").focus(),0);
+  }
+
+  function closeToolModal(){ $("toolModal")?.classList.add("hidden"); $("toolModal")?.setAttribute("aria-hidden","true"); }
+  $("addToolButton")?.addEventListener("click",()=>openToolModal());
+  $("closeToolModal")?.addEventListener("click",closeToolModal);
+  $("cancelToolButton")?.addEventListener("click",closeToolModal);
+  $("toolModal")?.addEventListener("click",e=>{if(e.target.dataset.closeToolModal)closeToolModal();});
+  let toolSearchTimer;
+  $("toolSearch")?.addEventListener("input",()=>{clearTimeout(toolSearchTimer);toolSearchTimer=setTimeout(()=>loadTools(),250);});
+
+  $("toolsBody")?.addEventListener("click",async e=>{
+    const b=e.target.closest("button[data-tool-action]"); if(!b)return;
+    const id=Number(b.dataset.id), action=b.dataset.toolAction; if(!id)return;
+    try{
+      const data=await getAdminTool(id), tool=data.tool;
+      if(action==="edit"){openToolModal(data);return;}
+      if(action==="toggle"){
+        await saveTool(id,tool,data.settings,{is_active:Number(tool.is_active)===1?0:1});
+        showMessage($("toolMessage"),"Tool status updated.","success");
+        await refreshAll(); return;
+      }
+      if(action==="delete"){
+        if(!window.confirm(`Delete “${tool.name}” from the Tools Manager? This removes only its manager record; tool files are not deleted.`))return;
+        await api(`/api/admin/tools/${id}`,{method:"DELETE"});
+        showMessage($("toolMessage"),"Tool deleted.","success");
+        await refreshAll();
+      }
+    }catch(error){showMessage($("toolMessage"),error.message||"Action failed.");}
+  });
+
+  async function saveTool(id,tool,settings,override={}){
+    const payload={name:tool.name,slug:tool.slug,description:tool.description||"",icon:tool.icon||"🛠️",category:tool.category||"Other",sort_order:Number(tool.sort_order||0),is_active:Number(tool.is_active)===1?1:0,show_on_home:Number(tool.show_on_home)===1?1:0,is_featured:Number(tool.is_featured)===1?1:0,version:tool.version||"1.0.0",settings:settings||{}};
+    Object.assign(payload,override);
+    return await api(`/api/admin/tools/${id}`,{method:"PUT",body:JSON.stringify(payload)});
+  }
+
+  $("toolForm")?.addEventListener("submit",async e=>{
+    e.preventDefault();
+    const button=$("saveToolButton"), id=$("toolId").value.trim(), raw=$("toolSettings").value.trim();
+    let settings={};
+    if(raw){try{settings=JSON.parse(raw);}catch{showMessage($("toolFormMessage"),"Settings must contain valid JSON.");return;}}
+    if(!settings||typeof settings!=="object"||Array.isArray(settings)){showMessage($("toolFormMessage"),"Settings must be a JSON object.");return;}
+    const payload={name:$("toolName").value.trim(),slug:$("toolSlug").value.trim().toLowerCase(),description:$("toolDescription").value.trim(),icon:$("toolIcon").value.trim(),category:$("toolCategory").value.trim(),sort_order:Number($("toolSort").value||0),is_active:$("toolActive").checked?1:0,show_on_home:$("toolHome").checked?1:0,is_featured:$("toolFeatured").checked?1:0,version:$("toolVersion").value.trim(),settings};
+    button.disabled=true; showMessage($("toolFormMessage"),"Saving…","success");
+    try{
+      await api(id?`/api/admin/tools/${id}`:"/api/admin/tools",{method:id?"PUT":"POST",body:JSON.stringify(payload)});
+      closeToolModal(); showMessage($("toolMessage"),id?"Tool updated successfully.":"Tool added successfully.","success"); await refreshAll();
+    }catch(error){showMessage($("toolFormMessage"),error.message||"Unable to save tool.");}
+    finally{button.disabled=false;}
+  });
+
+  async function loadForms
+(search = "") {
     const body = $("formsBody");
     if (!body) return;
     try {

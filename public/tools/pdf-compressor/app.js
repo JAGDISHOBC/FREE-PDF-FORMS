@@ -1,421 +1,275 @@
-(() => {
-  "use strict";
+const GS_MODULE_URL = 'https://cdn.jsdelivr.net/npm/@okathira/ghostpdl-wasm@1.1.0/dist/gs.js';
+const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.149/build/pdf.min.mjs';
+const PDFJS_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.149/build/pdf.worker.min.mjs';
 
-  document.addEventListener("DOMContentLoaded", () => {
-    const uploadArea = document.getElementById("uploadArea");
-    const browseButton = document.getElementById("browseButton");
-    const fileInput = document.getElementById("fileInput");
-    const fileInfo = document.getElementById("fileInfo");
-    const targetBox = document.getElementById("targetBox");
-    const targetSizeInput = document.getElementById("targetSizeInput");
-    const compressButton = document.getElementById("compressButton");
-    const status = document.getElementById("status");
-    const result = document.getElementById("result");
-    const resultInfo = document.getElementById("resultInfo");
-    const downloadButton = document.getElementById("downloadButton");
-    const resetButton = document.getElementById("resetButton");
+const $ = id => document.getElementById(id);
+const fmt = bytes => {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+};
+const pct = (a, b) => b > 0 ? ((1 - a / b) * 100) : 0;
+const safeName = name => (name.replace(/\.pdf$/i, '').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'compressed') + '.pdf';
 
-    const MAX_INPUT_BYTES = 25 * 1024 * 1024;
-    const MAX_PAGES = 50;
-    const MAX_TARGET_KB = 50000;
+const fileInput = $('fileInput'), drop = $('drop'), choose = $('choose');
+const fileInfo = $('fileInfo'), fileName = $('fileName'), fileSize = $('fileSize');
+const controls = $('controls'), compress = $('compress'), clear = $('clear');
+const status = $('status'), statusText = $('statusText'), bar = $('bar');
+const result = $('result'), resultMessage = $('resultMessage'), originalSize = $('originalSize');
+const compressedSize = $('compressedSize'), savedSize = $('savedSize');
+const download = $('download'), outName = $('outName'), testAgain = $('testAgain');
 
-    const state = {
-      file: null,
-      outputUrl: null
-    };
+let selectedFile = null, outputBlob = null, outputUrl = null, pdfjs = null, lastOriginalPages = null;
 
-    if (!uploadArea || !browseButton || !fileInput || !compressButton) {
-      console.error("PDF Compressor: required elements are missing.");
-      return;
+function setStatus(text, percent = null, kind = '') {
+  status.className = 'status show ' + kind;
+  statusText.textContent = text;
+  if (percent !== null) bar.style.width = Math.max(0, Math.min(100, percent)) + '%';
+}
+
+function resetStatus() {
+  status.className = 'status';
+  bar.style.width = '0%';
+  statusText.textContent = '';
+}
+
+function modeArgs(mode) {
+  const common = [
+    '-sDEVICE=pdfwrite', '-dCompatibilityLevel=1.7', '-dNOPAUSE', '-dBATCH', '-dSAFER',
+    '-dDetectDuplicateImages=true', '-dCompressFonts=true', '-dSubsetFonts=true',
+    '-dEmbedAllFonts=true', '-dCompressPages=true', '-dOptimize=true'
+  ];
+  if (mode === 'normal') return [...common, '-dPDFSETTINGS=/printer', '-dDownsampleColorImages=true', '-dColorImageDownsampleType=/Bicubic', '-dColorImageResolution=220', '-dDownsampleGrayImages=true', '-dGrayImageDownsampleType=/Bicubic', '-dGrayImageResolution=220', '-dDownsampleMonoImages=true', '-dMonoImageResolution=300'];
+  if (mode === 'strong') return [...common, '-dPDFSETTINGS=/screen', '-dDownsampleColorImages=true', '-dColorImageDownsampleType=/Bicubic', '-dColorImageResolution=100', '-dDownsampleGrayImages=true', '-dGrayImageDownsampleType=/Bicubic', '-dGrayImageResolution=120', '-dDownsampleMonoImages=true', '-dMonoImageResolution=200'];
+  return [...common, '-dPDFSETTINGS=/ebook', '-dDownsampleColorImages=true', '-dColorImageDownsampleType=/Bicubic', '-dColorImageResolution=150', '-dDownsampleGrayImages=true', '-dGrayImageDownsampleType=/Bicubic', '-dGrayImageResolution=150', '-dDownsampleMonoImages=true', '-dMonoImageResolution=240'];
+}
+
+async function loadPdfJs() {
+  if (pdfjs) return pdfjs;
+  pdfjs = await import(PDFJS_URL);
+  pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+  return pdfjs;
+}
+
+async function inspectPdf(blob, originalPages) {
+  try {
+    const pdf = await loadPdfJs();
+    const data = new Uint8Array(await blob.arrayBuffer());
+    const doc = await pdf.getDocument({ data, useWorkerFetch: false, isEvalSupported: false }).promise;
+    const pages = doc.numPages;
+    let textChars = 0;
+    
+    // Sample a maximum of 12 pages for text validation to maintain speed
+    const limit = Math.min(pages, 12);
+    for (let i = 1; i <= limit; i++) {
+      const page = await doc.getPage(i);
+      const tc = await page.getTextContent();
+      textChars += tc.items.reduce((n, x) => n + (x.str || '').length, 0);
+    }
+    
+    const openEl = $('checkOpen'), pagesEl = $('checkPages'), textEl = $('checkText'), searchEl = $('checkSearch');
+    openEl.className = 'check ok';
+    openEl.textContent = '✓ PDF opens successfully';
+    
+    pagesEl.className = 'check ' + (pages === originalPages ? 'ok' : 'fail');
+    pagesEl.textContent = (pages === originalPages ? '✓ ' : '✗ ') + `Pages preserved: ${pages}/${originalPages}`;
+    
+    textEl.className = 'check ' + (textChars > 0 ? 'ok' : 'fail');
+    textEl.textContent = (textChars > 0 ? '✓ ' : '✗ ') + `Text layer detected: ${textChars.toLocaleString()} characters`;
+    
+    searchEl.className = 'check ' + (textChars > 0 ? 'ok' : 'fail');
+    searchEl.textContent = (textChars > 0 ? '✓ ' : '✗ ') + (textChars > 0 ? 'Search/selectability should be available' : 'No extractable text detected in sampled pages');
+    
+    await doc.destroy();
+  } catch (e) {
+    for (const id of ['checkOpen', 'checkPages', 'checkText', 'checkSearch']) {
+      $(id).className = 'check fail';
+      $(id).textContent = '✗ Validation error: ' + (e.message || e);
+    }
+  }
+}
+
+async function compressWithGhostscript(file, mode) {
+  const { default: loadWASM } = await import(GS_MODULE_URL);
+  setStatus('Loading PDF engine…', 8);
+  const Module = await loadWASM();
+  
+  setStatus('Preparing PDF…', 18);
+  const inputName = 'input.pdf', outputName = 'output.pdf';
+  
+  // Ensure clean state
+  try { Module.FS.unlink(inputName); } catch {}
+  try { Module.FS.unlink(outputName); } catch {}
+  
+  Module.FS.writeFile(inputName, new Uint8Array(await file.arrayBuffer()));
+  setStatus(`Compressing (${mode})…`, 35);
+  
+  const args = [...modeArgs(mode), '-sOutputFile=' + outputName, inputName];
+  Module.callMain(args);
+  
+  setStatus('Reading optimized PDF…', 82);
+  const bytes = Module.FS.readFile(outputName, { encoding: 'binary' });
+  
+  // Cleanup WASM FileSystem footprint
+  try { Module.FS.unlink(inputName); } catch {}
+  try { Module.FS.unlink(outputName); } catch {}
+  
+  return new Blob([bytes], { type: 'application/pdf' });
+}
+
+async function run() {
+  if (!selectedFile) return;
+  const mode = document.querySelector('input[name="level"]:checked').value;
+  
+  compress.disabled = true;
+  clear.disabled = true;
+  result.classList.remove('show');
+  outputBlob = null;
+  download.disabled = true;
+
+  try {
+    setStatus('Starting ' + mode + ' compression…', 3);
+    
+    outputBlob = await compressWithGhostscript(selectedFile, mode);
+    const reduction = pct(outputBlob.size, selectedFile.size);
+    
+    originalSize.textContent = fmt(selectedFile.size);
+    compressedSize.textContent = fmt(outputBlob.size);
+    savedSize.textContent = reduction > 0 ? `${reduction.toFixed(1)}%` : '0%';
+    outName.value = safeName(selectedFile.name.replace(/\.pdf$/i, '') + '_' + mode);
+
+    if (outputBlob.size < selectedFile.size * 0.99) {
+      resultMessage.className = 'status show ok';
+      resultMessage.textContent = `✓ ${mode[0].toUpperCase() + mode.slice(1)} compression produced a smaller PDF.`;
+      download.disabled = false;
+    } else {
+      resultMessage.className = 'status show';
+      resultMessage.textContent = 'This PDF is already well optimized at this compression level. Further reduction may affect quality.';
+      download.disabled = false;
     }
 
-    if (window.pdfjsLib) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-    }
+    result.classList.add('show');
+    setStatus('Compression complete.', 100, 'ok');
 
-    function formatBytes(bytes) {
-      if (!Number.isFinite(bytes) || bytes < 0) return "0 B";
-      if (bytes < 1024) return `${bytes} B`;
-      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-    }
+    await inspectPdf(outputBlob, lastOriginalPages);
+    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    function setStatus(message, type = "") {
-      status.textContent = message || "";
-      status.className = `status${type ? ` ${type}` : ""}`;
-    }
+  } catch (e) {
+    console.error(e);
+    setStatus('Compression failed: ' + (e.message || e), 0, 'error');
+    resultMessage.className = 'status show error';
+    resultMessage.textContent = 'Compression failed. Open browser DevTools Console for the technical error.';
+    result.classList.add('show');
+  } finally {
+    compress.disabled = false;
+    clear.disabled = false;
+  }
+}
 
-    function revokeOutput() {
-      if (state.outputUrl) {
-        URL.revokeObjectURL(state.outputUrl);
-        state.outputUrl = null;
-      }
-    }
+async function selectFile(file) {
+  if (!file) return;
+  
+  if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
+    setStatus('Please choose a valid PDF file.', 0, 'error');
+    return;
+  }
 
-    function validateFile(file) {
-      if (!file) return "Please choose a PDF.";
-      const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
-      if (!isPdf) return "Please choose a PDF file.";
-      if (file.size <= 0) return "The selected PDF is empty.";
-      if (file.size > MAX_INPUT_BYTES) return "PDF is too large. Maximum input size is 25 MB.";
-      return null;
-    }
+  if (file.size > 50 * 1024 * 1024) {
+    setStatus('File exceeds 50MB limit.', 0, 'error');
+    return;
+  }
 
-    async function inspectPdf(file) {
-      if (!window.pdfjsLib) {
-        throw new Error("PDF engine could not be loaded.");
-      }
+  // Instant UI update independent of libraries
+  selectedFile = file;
+  fileName.textContent = file.name;
+  fileSize.textContent = fmt(file.size);
+  fileInfo.classList.add('show');
+  controls.classList.remove('hidden');
+  compress.disabled = false;
+  resetStatus();
+  result.classList.remove('show');
+  outName.value = safeName(file.name.replace(/\.pdf$/i, '') + '_compressed');
+  lastOriginalPages = null;
 
-      const buffer = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({ data: buffer });
-      const pdf = await loadingTask.promise;
+  // Background page counting
+  try {
+    const pdf = await loadPdfJs();
+    const src = new Uint8Array(await selectedFile.arrayBuffer());
+    const doc = await pdf.getDocument({ data: src, useWorkerFetch: false, isEvalSupported: false }).promise;
+    lastOriginalPages = doc.numPages;
+    await doc.destroy();
+  } catch (err) {
+    console.warn("Could not determine original page count:", err);
+  }
+}
 
-      if (pdf.numPages > MAX_PAGES) {
-        throw new Error(`This tool supports up to ${MAX_PAGES} pages per PDF.`);
-      }
-
-      return { buffer, pageCount: pdf.numPages, pdf };
-    }
-
-    async function handleFile(file) {
-      setStatus("");
-      result.classList.remove("visible");
-      revokeOutput();
-
-      const error = validateFile(file);
-      if (error) {
-        fileInput.value = "";
-        targetBox.classList.remove("visible");
-        fileInfo.classList.remove("visible");
-        setStatus(error, "error");
-        return;
-      }
-
-      try {
-        compressButton.disabled = true;
-        setStatus("Checking PDF...");
-
-        const info = await inspectPdf(file);
-
-        state.file = file;
-        fileInfo.textContent =
-          `${file.name} • ${formatBytes(file.size)} • ${info.pageCount} page${info.pageCount === 1 ? "" : "s"}`;
-        fileInfo.classList.add("visible");
-
-        targetSizeInput.value = "";
-        targetBox.classList.add("visible");
-        setStatus("PDF ready. Enter your target size.");
-      } catch (error) {
-        console.error(error);
-        state.file = null;
-        fileInfo.classList.remove("visible");
-        targetBox.classList.remove("visible");
-        setStatus(error.message || "This PDF could not be opened.", "error");
-      } finally {
-        compressButton.disabled = false;
-      }
-    }
-
-    function openPicker() {
-      fileInput.value = "";
+// Bind events cleanly
+function init() {
+  choose.addEventListener('click', (e) => {
+    e.preventDefault();
+    fileInput.click();
+  });
+  
+  drop.addEventListener('click', (e) => {
+    if (e.target !== choose && e.target !== fileInput) fileInput.click();
+  });
+  
+  drop.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
       fileInput.click();
     }
-
-    browseButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openPicker();
-    });
-
-    uploadArea.addEventListener("click", (event) => {
-      if (event.target.closest("#browseButton")) return;
-      openPicker();
-    });
-
-    uploadArea.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openPicker();
-      }
-    });
-
-    fileInput.addEventListener("change", () => {
-      const file = fileInput.files?.[0];
-      if (file) handleFile(file);
-    });
-
-    uploadArea.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      uploadArea.classList.add("dragover");
-    });
-
-    uploadArea.addEventListener("dragleave", () => {
-      uploadArea.classList.remove("dragover");
-    });
-
-    uploadArea.addEventListener("drop", (event) => {
-      event.preventDefault();
-      uploadArea.classList.remove("dragover");
-      const file = event.dataTransfer?.files?.[0];
-      if (file) handleFile(file);
-    });
-
-    compressButton.addEventListener("click", async () => {
-      setStatus("");
-      result.classList.remove("visible");
-      revokeOutput();
-
-      if (!state.file) {
-        setStatus("Please choose a PDF first.", "error");
-        return;
-      }
-
-      const targetKB = Number(targetSizeInput.value);
-
-      if (!Number.isFinite(targetKB) || targetKB < 10) {
-        setStatus("Please enter a target size of at least 10 KB.", "error");
-        targetSizeInput.focus();
-        return;
-      }
-
-      if (targetKB > MAX_TARGET_KB) {
-        setStatus(`Target size cannot be more than ${MAX_TARGET_KB.toLocaleString()} KB.`, "error");
-        return;
-      }
-
-      const targetBytes = Math.floor(targetKB * 1024);
-
-      compressButton.disabled = true;
-      compressButton.textContent = "Compressing...";
-      setStatus("Preparing PDF pages...");
-
-      try {
-        const best = await findBestPdf(state.file, targetBytes);
-
-        if (!best || best.bytes.length > targetBytes) {
-          throw new Error(
-            "This PDF could not be reduced to the requested size safely. Try a slightly larger target."
-          );
-        }
-
-        revokeOutput();
-        state.outputUrl = URL.createObjectURL(
-          new Blob([best.bytes], { type: "application/pdf" })
-        );
-
-        const finalKB = best.bytes.length / 1024;
-        const differenceKB = targetKB - finalKB;
-        const baseName = safeBaseName(state.file.name);
-        const filename = `${baseName}-compressed.pdf`;
-
-        downloadButton.href = state.outputUrl;
-        downloadButton.download = filename;
-
-        resultInfo.innerHTML = `
-          <div class="result-line">Original Size: <strong>${formatBytes(state.file.size)}</strong></div>
-          <div class="result-line">Target Size: <strong>${targetKB.toFixed(1)} KB</strong></div>
-          <div class="result-line">Final Size: <strong>${finalKB.toFixed(1)} KB</strong></div>
-          <div class="result-line">Pages: <strong>${best.pageCount}</strong></div>
-          <div class="result-line" style="margin-top:10px;color:#15803d;font-weight:800">
-            ✅ ${differenceKB.toFixed(1)} KB below target
-          </div>
-        `;
-
-        result.classList.add("visible");
-        setStatus("Compression complete.", "success");
-
-        setTimeout(() => {
-          result.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 100);
-      } catch (error) {
-        console.error("PDF compression error:", error);
-        setStatus(
-          error.message || "PDF compression failed. Please try another PDF.",
-          "error"
-        );
-      } finally {
-        compressButton.disabled = false;
-        compressButton.textContent = "Compress to Target Size";
-      }
-    });
-
-    async function findBestPdf(file, targetBytes) {
-      const buffer = await file.arrayBuffer();
-
-      const scales = [1, 0.85, 0.70, 0.58, 0.48, 0.40, 0.33, 0.27, 0.22, 0.18, 0.15, 0.12];
-      const qualities = [0.82, 0.72, 0.62, 0.52, 0.44, 0.36, 0.30, 0.25, 0.20, 0.16];
-
-      let best = null;
-
-      for (const scale of scales) {
-        setStatus(`Rendering pages at ${Math.round(scale * 100)}%...`);
-
-        const rendered = await renderPages(buffer, scale);
-
-        for (const quality of qualities) {
-          setStatus(
-            `Testing compression: ${Math.round(scale * 100)}% • JPEG ${Math.round(quality * 100)}%...`
-          );
-
-          const candidate = await buildPdf(rendered, quality);
-
-          if (candidate.bytes.length <= targetBytes) {
-            if (!best || candidate.bytes.length > best.bytes.length) {
-              best = candidate;
-            }
-
-            if (targetBytes - candidate.bytes.length <= 3 * 1024) {
-              return best;
-            }
-          }
-
-          await nextFrame();
-        }
-
-        if (best) {
-          return best;
-        }
-
-        await nextFrame();
-      }
-
-      return best;
-    }
-
-    async function renderPages(buffer, scale) {
-      const loadingTask = pdfjsLib.getDocument({ data: buffer });
-      const pdf = await loadingTask.promise;
-
-      if (pdf.numPages > MAX_PAGES) {
-        throw new Error(`This tool supports up to ${MAX_PAGES} pages per PDF.`);
-      }
-
-      const pages = [];
-
-      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-        setStatus(`Rendering page ${pageNumber} of ${pdf.numPages}...`);
-
-        const page = await pdf.getPage(pageNumber);
-        const viewport = page.getViewport({ scale });
-
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.floor(viewport.width));
-        canvas.height = Math.max(1, Math.floor(viewport.height));
-
-        const context = canvas.getContext("2d", { alpha: false });
-        if (!context) throw new Error("Browser canvas is not available.");
-
-        context.fillStyle = "#ffffff";
-        context.fillRect(0, 0, canvas.width, canvas.height);
-
-        await page.render({
-          canvasContext: context,
-          viewport
-        }).promise;
-
-        pages.push({
-          canvas,
-          width: viewport.width,
-          height: viewport.height
-        });
-
-        await nextFrame();
-      }
-
-      return pages;
-    }
-
-    async function canvasToJpeg(canvas, quality) {
-      return new Promise((resolve, reject) => {
-        canvas.toBlob(
-          (blob) => {
-            if (blob) resolve(blob);
-            else reject(new Error("Could not encode a PDF page."));
-          },
-          "image/jpeg",
-          quality
-        );
-      });
-    }
-
-    async function buildPdf(pages, quality) {
-      if (!window.PDFLib) {
-        throw new Error("PDF creation engine could not be loaded.");
-      }
-
-      const pdfDoc = await PDFLib.PDFDocument.create();
-
-      for (let i = 0; i < pages.length; i++) {
-        const jpgBlob = await canvasToJpeg(pages[i].canvas, quality);
-        const jpgBytes = new Uint8Array(await jpgBlob.arrayBuffer());
-        const image = await pdfDoc.embedJpg(jpgBytes);
-
-        const page = pdfDoc.addPage([
-          pages[i].width,
-          pages[i].height
-        ]);
-
-        page.drawImage(image, {
-          x: 0,
-          y: 0,
-          width: pages[i].width,
-          height: pages[i].height
-        });
-
-        await nextFrame();
-      }
-
-      const bytes = await pdfDoc.save({
-        useObjectStreams: true,
-        addDefaultPage: false
-      });
-
-      return {
-        bytes,
-        pageCount: pages.length
-      };
-    }
-
-    resetButton.addEventListener("click", () => {
-      revokeOutput();
-
-      state.file = null;
-      fileInput.value = "";
-      targetSizeInput.value = "";
-
-      fileInfo.textContent = "";
-      fileInfo.classList.remove("visible");
-
-      targetBox.classList.remove("visible");
-      result.classList.remove("visible");
-
-      downloadButton.removeAttribute("href");
-      downloadButton.removeAttribute("download");
-
-      setStatus("");
-    });
-
-    window.addEventListener("beforeunload", revokeOutput);
-
-    function nextFrame() {
-      return new Promise((resolve) => {
-        requestAnimationFrame(resolve);
-      });
-    }
-
-    function safeBaseName(filename) {
-      const original = String(filename || "document")
-        .replace(/\.[^/.]+$/, "");
-
-      const safe = original
-        .replace(/[^a-zA-Z0-9_-]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 80);
-
-      return safe || "document";
-    }
-
-    console.log("PDF Compressor initialized successfully.");
   });
-})();
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files && fileInput.files.length > 0) selectFile(fileInput.files[0]);
+  });
+
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault();
+    drop.classList.add('drag');
+  }));
+  
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => {
+    e.preventDefault();
+    drop.classList.remove('drag');
+  }));
+  
+  drop.addEventListener('drop', e => {
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) selectFile(e.dataTransfer.files[0]);
+  });
+
+  compress.addEventListener('click', run);
+  clear.addEventListener('click', () => location.reload());
+  
+  testAgain.addEventListener('click', () => {
+    result.classList.remove('show');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  download.addEventListener('click', () => {
+    if (!outputBlob) return;
+    if (outputUrl) URL.revokeObjectURL(outputUrl);
+    outputUrl = URL.createObjectURL(outputBlob);
+    const a = document.createElement('a');
+    a.href = outputUrl;
+    a.download = safeName(outName.value);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+  document.querySelectorAll('.level').forEach(l => {
+    l.addEventListener('click', () => {
+      document.querySelectorAll('.level').forEach(x => x.classList.remove('selected'));
+      l.classList.add('selected');
+      l.querySelector('input').checked = true;
+    });
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

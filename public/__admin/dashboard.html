@@ -29,10 +29,26 @@
     </section>
 
     <section class="stats-grid" aria-label="Website totals">
+      <article class="stat-card"><span>Online Tools</span><strong id="toolCount">0</strong></article>
       <article class="stat-card"><span>Departments</span><strong id="departmentCount">—</strong></article>
       <article class="stat-card"><span>PDF Forms</span><strong id="formCount">—</strong></article>
       <article class="stat-card"><span>Government Links</span><strong id="linkCount">—</strong></article>
     </section>
+
+    <section class="manager-card" id="toolsManager">
+      <div class="section-heading"><div><p class="eyebrow">ONLINE TOOLS</p><h2>Tools Manager</h2><p class="muted">Manage current and future online tools.</p></div><button id="addToolButton" class="primary-button" type="button">＋ Add Tool</button></div>
+      <div class="toolbar-row"><input id="toolSearch" type="search" placeholder="Search tools, slugs or categories" autocomplete="off"></div>
+      <div id="toolMessage" class="message" role="status" aria-live="polite"></div>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Order</th><th>Tool</th><th>Category</th><th>Visibility</th><th>Status</th><th>Version</th><th>Actions</th></tr></thead><tbody id="toolsBody"><tr><td colspan="7" class="table-empty">Loading tools…</td></tr></tbody></table></div>
+    </section>
+
+    <div id="toolModal" class="modal hidden" aria-hidden="true"><div class="modal-backdrop" data-close-tool-modal="1"></div><section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="toolModalTitle"><div class="modal-header"><div><p class="eyebrow">ONLINE TOOL</p><h2 id="toolModalTitle">Add Tool</h2></div><button id="closeToolModal" class="icon-button" type="button" aria-label="Close">×</button></div>
+      <form id="toolForm"><input type="hidden" id="toolId"><label for="toolName">Tool name</label><input id="toolName" maxlength="150" required placeholder="e.g. PDF Compressor"><label for="toolSlug">Slug</label><input id="toolSlug" maxlength="120" required placeholder="e.g. pdf-compressor" pattern="[a-z0-9]+(?:-[a-z0-9]+)*"><label for="toolDescription">Description</label><textarea id="toolDescription" maxlength="1000" rows="3"></textarea>
+      <div class="form-grid"><div><label for="toolIcon">Icon</label><input id="toolIcon" maxlength="20" value="🛠️"></div><div><label for="toolCategory">Category</label><input id="toolCategory" maxlength="80" value="Other"></div></div>
+      <div class="form-grid"><div><label for="toolSort">Sort order</label><input id="toolSort" type="number" min="0" max="999999" value="1"></div><div><label for="toolVersion">Version</label><input id="toolVersion" maxlength="30" value="1.0.0"></div></div>
+      <div class="checkbox-grid"><label class="checkbox-row"><input id="toolActive" type="checkbox" checked><span>Active</span></label><label class="checkbox-row"><input id="toolHome" type="checkbox" checked><span>Show on Home</span></label><label class="checkbox-row"><input id="toolFeatured" type="checkbox"><span>Featured / Popular</span></label></div>
+      <label for="toolSettings">Tool settings (JSON, optional)</label><textarea id="toolSettings" rows="7" spellcheck="false" placeholder='{"maxUploadMb":25,"allowedFormats":["pdf"]}'></textarea><p class="muted form-help">Per-tool settings are stored for later tool integrations.</p><div id="toolFormMessage" class="message" role="alert"></div><div class="modal-actions"><button id="cancelToolButton" class="secondary-button" type="button">Cancel</button><button id="saveToolButton" class="primary-button" type="submit">Save Tool</button></div></form>
+      </section></div>
 
     <section class="manager-card" id="departmentsManager">
       <div class="section-heading">

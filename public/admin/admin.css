@@ -70,3 +70,5 @@ button{font:inherit}
 .status-badge.inactive { color: #8a5a00; }
 
 .link-url-cell{max-width:280px;overflow-wrap:anywhere}
+
+.checkbox-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.tool-flags{display:flex;flex-wrap:wrap;gap:6px}.form-help{margin-top:-6px;font-size:12px}@media (max-width:760px){.checkbox-grid{grid-template-columns:1fr}}

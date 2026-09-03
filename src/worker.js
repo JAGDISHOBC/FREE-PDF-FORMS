@@ -75,6 +75,10 @@ export default {
         return await getSiteSettings(env, commonHeaders);
       }
 
+      if (path === "/api/tools" && request.method === "GET") {
+        return await getPublicTools(env, commonHeaders);
+      }
+
       // --------------------------------------------------
       // Individual form information
       // --------------------------------------------------
@@ -170,6 +174,14 @@ export default {
         return await handleAdminSettingsUpdate(request, env, commonHeaders);
       }
 
+      if (path === "/api/admin/tools" && request.method === "GET") {
+        return await handleAdminToolsList(request, env, commonHeaders, url);
+      }
+
+      if (path === "/api/admin/tools" && request.method === "POST") {
+        return await handleAdminToolCreate(request, env, commonHeaders);
+      }
+
       if (path === "/api/admin/departments" && request.method === "GET") {
         return await handleAdminDepartmentsList(request, env, commonHeaders);
       }
@@ -230,6 +242,15 @@ export default {
         }
       }
 
+      const adminToolMatch = path.match(/^\/api\/admin\/tools\/([0-9]+)$/);
+
+      if (adminToolMatch) {
+        const toolId = Number(adminToolMatch[1]);
+        if (request.method === "GET") return await handleAdminToolGet(request, env, commonHeaders, toolId);
+        if (request.method === "PUT") return await handleAdminToolUpdate(request, env, commonHeaders, toolId);
+        if (request.method === "DELETE") return await handleAdminToolDelete(request, env, commonHeaders, toolId);
+      }
+
       const adminDepartmentMatch = path.match(/^\/api\/admin\/departments\/([0-9]+)$/);
 
       if (adminDepartmentMatch) {
@@ -265,6 +286,19 @@ export default {
           return await serveAdminPage(request, env, false);
         }
         return await serveAdminAsset(request, env, "/__admin/dashboard.html");
+      }
+
+      // --------------------------------------------------
+      // Public online tool access control
+      // --------------------------------------------------
+      // Only exact /tools/<slug> and /tools/<slug>/ page requests
+      // are checked here. Child assets such as app.js/css continue
+      // through the normal Static Assets handler.
+      const publicToolMatch = path.match(/^\/tools\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\/)?$/);
+
+      if (publicToolMatch && request.method === "GET") {
+        const toolSlug = publicToolMatch[1];
+        return await servePublicToolPage(request, env, commonHeaders, toolSlug);
       }
 
       // --------------------------------------------------
@@ -547,16 +581,11 @@ async function handleAdminDashboard(request, env, commonHeaders) {
   }
 
   try {
-    const [departments, forms, links] = await Promise.all([
-      env.DB.prepare(
-        "SELECT COUNT(*) AS count FROM departments"
-      ).first(),
-      env.DB.prepare(
-        "SELECT COUNT(*) AS count FROM forms"
-      ).first(),
-      env.DB.prepare(
-        "SELECT COUNT(*) AS count FROM government_links"
-      ).first()
+    const [departments, forms, links, tools] = await Promise.all([
+      env.DB.prepare("SELECT COUNT(*) AS count FROM departments").first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM forms").first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM government_links").first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM tools").first()
     ]);
 
     return jsonResponse({
@@ -564,7 +593,8 @@ async function handleAdminDashboard(request, env, commonHeaders) {
       data: {
         departments: Number(departments?.count || 0),
         forms: Number(forms?.count || 0),
-        governmentLinks: Number(links?.count || 0)
+        governmentLinks: Number(links?.count || 0),
+        tools: Number(tools?.count || 0)
       }
     }, 200, {
       ...commonHeaders,
@@ -1051,6 +1081,79 @@ async function handleAdminLinkDelete(request, env, commonHeaders, linkId) {
   }
 }
 
+async function handleAdminToolsList(request, env, commonHeaders, url) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+  const search = String(url.searchParams.get("search") || "").trim();
+  try {
+    let query = `SELECT id,name,slug,description,icon,category,sort_order,is_active,show_on_home,is_featured,version,created_at,updated_at,
+      (SELECT COUNT(*) FROM tool_settings ts WHERE ts.tool_id=tools.id) AS setting_count FROM tools`;
+    const params=[];
+    if(search){ query += ` WHERE LOWER(name) LIKE LOWER(?) OR LOWER(slug) LIKE LOWER(?) OR LOWER(category) LIKE LOWER(?)`; const t=`%${search}%`; params.push(t,t,t); }
+    query += ` ORDER BY sort_order ASC, id ASC`;
+    const result=await env.DB.prepare(query).bind(...params).all();
+    return jsonResponse({success:true,data:{tools:result.results||[]}},200,{...commonHeaders,"Cache-Control":"no-store"});
+  } catch(error){ console.error("Admin tools list error:",error); return jsonResponse({success:false,error:"Unable to load tools."},500,commonHeaders); }
+}
+
+function normalizeToolPayload(body){
+  const name=String(body?.name??"").trim(), slug=String(body?.slug??"").trim().toLowerCase();
+  const description=String(body?.description??"").trim(), icon=String(body?.icon??"🛠️").trim()||"🛠️";
+  const category=String(body?.category??"Other").trim()||"Other", sortOrder=Number(body?.sort_order??0);
+  const isActive=Number(body?.is_active)===1?1:0, showOnHome=Number(body?.show_on_home)===1?1:0, isFeatured=Number(body?.is_featured)===1?1:0;
+  const version=String(body?.version??"1.0.0").trim()||"1.0.0";
+  if(!name) return {error:"Tool name is required."}; if(name.length>150) return {error:"Tool name must be 150 characters or fewer."};
+  if(!slug) return {error:"Tool slug is required."}; if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return {error:"Slug may contain lowercase letters, numbers and hyphens only."};
+  if(slug.length>120) return {error:"Slug must be 120 characters or fewer."}; if(description.length>1000) return {error:"Description must be 1000 characters or fewer."};
+  if(icon.length>20) return {error:"Icon must be 20 characters or fewer."}; if(category.length>80) return {error:"Category must be 80 characters or fewer."};
+  if(!Number.isInteger(sortOrder)||sortOrder<0||sortOrder>999999) return {error:"Sort order must be a whole number between 0 and 999999."};
+  if(version.length>30) return {error:"Version must be 30 characters or fewer."};
+  return {data:{name,slug,description,icon,category,sortOrder,isActive,showOnHome,isFeatured,version}};
+}
+function normalizeToolSettings(settings){
+  if(settings===undefined||settings===null||settings==="") return {data:{}};
+  if(typeof settings!=="object"||Array.isArray(settings)) return {error:"Settings must be a JSON object."};
+  const entries=Object.entries(settings); if(entries.length>50) return {error:"A tool may have at most 50 settings."};
+  for(const [key,value] of entries){
+    if(!/^[A-Za-z0-9_.-]{1,100}$/.test(key)) return {error:"Setting keys may contain letters, numbers, dots, underscores and hyphens only."};
+    if(!["string","number","boolean"].includes(typeof value)&&value!==null) return {error:`Setting "${key}" must be text, number, boolean or null.`};
+    if(typeof value==="string"&&value.length>5000) return {error:`Setting "${key}" is too long.`};
+  } return {data:settings};
+}
+async function getAdminToolRecord(env,id){ return await env.DB.prepare(`SELECT id,name,slug,description,icon,category,sort_order,is_active,show_on_home,is_featured,version,created_at,updated_at FROM tools WHERE id=? LIMIT 1`).bind(id).first(); }
+async function getAdminToolSettings(env,id){
+  const result=await env.DB.prepare(`SELECT setting_key,setting_value FROM tool_settings WHERE tool_id=? ORDER BY setting_key ASC`).bind(id).all(); const settings={};
+  for(const row of result.results||[]){ try{settings[row.setting_key]=JSON.parse(row.setting_value);}catch{settings[row.setting_key]=row.setting_value;} } return settings;
+}
+async function handleAdminToolCreate(request,env,commonHeaders){
+  const authError=await requireAdmin(request,env,commonHeaders); if(authError) return authError;
+  try{ const body=await request.json(), payload=normalizeToolPayload(body); if(payload.error) return jsonResponse({success:false,error:payload.error},400,commonHeaders);
+    const settings=normalizeToolSettings(body?.settings); if(settings.error) return jsonResponse({success:false,error:settings.error},400,commonHeaders);
+    const duplicate=await env.DB.prepare(`SELECT id FROM tools WHERE name=? OR slug=? LIMIT 1`).bind(payload.data.name,payload.data.slug).first(); if(duplicate) return jsonResponse({success:false,error:"A tool with this name or slug already exists."},409,commonHeaders);
+    const result=await env.DB.prepare(`INSERT INTO tools (name,slug,description,icon,category,sort_order,is_active,show_on_home,is_featured,version) VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING id,name,slug,description,icon,category,sort_order,is_active,show_on_home,is_featured,version,created_at,updated_at`).bind(payload.data.name,payload.data.slug,payload.data.description,payload.data.icon,payload.data.category,payload.data.sortOrder,payload.data.isActive,payload.data.showOnHome,payload.data.isFeatured,payload.data.version).first();
+    if(!result) throw new Error("Tool insert returned no row.");
+    for(const [key,value] of Object.entries(settings.data)) await env.DB.prepare(`INSERT INTO tool_settings (tool_id,setting_key,setting_value) VALUES (?,?,?)`).bind(result.id,key,JSON.stringify(value)).run();
+    return jsonResponse({success:true,message:"Tool added successfully.",data:{tool:result,settings:settings.data}},201,{...commonHeaders,"Cache-Control":"no-store"});
+  }catch(error){ console.error("Admin tool create error:",error); const m=String(error?.message||""); if(m.includes("UNIQUE")||m.includes("constraint")) return jsonResponse({success:false,error:"A tool with this name or slug already exists."},409,commonHeaders); return jsonResponse({success:false,error:"Unable to add tool."},500,commonHeaders); }
+}
+async function handleAdminToolGet(request,env,commonHeaders,id){
+  const authError=await requireAdmin(request,env,commonHeaders); if(authError) return authError; if(!Number.isInteger(id)||id<1) return jsonResponse({success:false,error:"Invalid tool ID."},400,commonHeaders);
+  try{const tool=await getAdminToolRecord(env,id); if(!tool) return jsonResponse({success:false,code:"NOT_FOUND",error:"Tool not found."},404,commonHeaders); return jsonResponse({success:true,data:{tool,settings:await getAdminToolSettings(env,id)}},200,{...commonHeaders,"Cache-Control":"no-store"});}catch(error){console.error("Admin tool get error:",error);return jsonResponse({success:false,error:"Unable to load tool."},500,commonHeaders);}
+}
+async function handleAdminToolUpdate(request,env,commonHeaders,id){
+  const authError=await requireAdmin(request,env,commonHeaders); if(authError) return authError; if(!Number.isInteger(id)||id<1) return jsonResponse({success:false,error:"Invalid tool ID."},400,commonHeaders);
+  try{const existing=await getAdminToolRecord(env,id); if(!existing) return jsonResponse({success:false,code:"NOT_FOUND",error:"Tool not found."},404,commonHeaders); const body=await request.json(); const payload=normalizeToolPayload(body); if(payload.error) return jsonResponse({success:false,error:payload.error},400,commonHeaders); const settings=normalizeToolSettings(body?.settings); if(settings.error) return jsonResponse({success:false,error:settings.error},400,commonHeaders);
+    const duplicate=await env.DB.prepare(`SELECT id FROM tools WHERE (name=? OR slug=?) AND id!=? LIMIT 1`).bind(payload.data.name,payload.data.slug,id).first(); if(duplicate) return jsonResponse({success:false,error:"Another tool with this name or slug already exists."},409,commonHeaders);
+    const result=await env.DB.prepare(`UPDATE tools SET name=?,slug=?,description=?,icon=?,category=?,sort_order=?,is_active=?,show_on_home=?,is_featured=?,version=?,updated_at=CURRENT_TIMESTAMP WHERE id=? RETURNING id,name,slug,description,icon,category,sort_order,is_active,show_on_home,is_featured,version,created_at,updated_at`).bind(payload.data.name,payload.data.slug,payload.data.description,payload.data.icon,payload.data.category,payload.data.sortOrder,payload.data.isActive,payload.data.showOnHome,payload.data.isFeatured,payload.data.version,id).first();
+    await env.DB.prepare(`DELETE FROM tool_settings WHERE tool_id=?`).bind(id).run(); for(const [key,value] of Object.entries(settings.data)) await env.DB.prepare(`INSERT INTO tool_settings (tool_id,setting_key,setting_value) VALUES (?,?,?)`).bind(id,key,JSON.stringify(value)).run();
+    return jsonResponse({success:true,message:"Tool updated successfully.",data:{tool:result,settings:settings.data}},200,{...commonHeaders,"Cache-Control":"no-store"});
+  }catch(error){console.error("Admin tool update error:",error);return jsonResponse({success:false,error:"Unable to update tool."},500,commonHeaders);}
+}
+async function handleAdminToolDelete(request,env,commonHeaders,id){
+  const authError=await requireAdmin(request,env,commonHeaders); if(authError) return authError; if(!Number.isInteger(id)||id<1) return jsonResponse({success:false,error:"Invalid tool ID."},400,commonHeaders);
+  try{const existing=await getAdminToolRecord(env,id); if(!existing) return jsonResponse({success:false,code:"NOT_FOUND",error:"Tool not found."},404,commonHeaders); await env.DB.prepare(`DELETE FROM tools WHERE id=?`).bind(id).run(); return jsonResponse({success:true,message:"Tool deleted successfully."},200,{...commonHeaders,"Cache-Control":"no-store"});}catch(error){console.error("Admin tool delete error:",error);return jsonResponse({success:false,error:"Unable to delete tool."},500,commonHeaders);}
+}
+
 async function handleAdminSettingsGet(request, env, commonHeaders) {
   const authError = await requireAdmin(request, env, commonHeaders);
   if (authError) return authError;
@@ -1326,6 +1429,30 @@ async function getDepartments(env, commonHeaders) {
   }
 }
 
+
+
+async function getPublicTools(env, commonHeaders) {
+  try {
+    const result = await env.DB.prepare(`
+      SELECT id, name, slug, description, icon, category, sort_order,
+             is_active, show_on_home, is_featured, version
+      FROM tools
+      WHERE is_active = 1
+      ORDER BY sort_order ASC, id ASC
+    `).all();
+
+    return jsonResponse({
+      success: true,
+      data: result.results || []
+    }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Public tools API error:", error);
+    return jsonResponse({
+      success: false,
+      error: "Unable to load online tools."
+    }, 500, commonHeaders);
+  }
+}
 
 /**
  * Get active forms.
@@ -1729,6 +1856,68 @@ function safeFilename(filename) {
 // RESPONSE HELPERS
 // ======================================================
 
+
+
+// Serve a public tool page only when the tool is active.
+// show_on_home controls Home-page visibility only; it does not
+// prevent an active tool from being opened directly.
+async function servePublicToolPage(request, env, commonHeaders, toolSlug) {
+  try {
+    const tool = await env.DB.prepare(`
+      SELECT id, slug, is_active
+      FROM tools
+      WHERE slug = ?
+      LIMIT 1
+    `).bind(toolSlug).first();
+
+    if (!tool || Number(tool.is_active) !== 1) {
+      return new Response("Tool not available.", {
+        status: 404,
+        headers: {
+          ...commonHeaders,
+          "Cache-Control": "no-store",
+          "Content-Type": "text/plain; charset=UTF-8"
+        }
+      });
+    }
+
+    if (!env.ASSETS) {
+      return new Response("Tool is unavailable.", {
+        status: 500,
+        headers: {
+          ...commonHeaders,
+          "Content-Type": "text/plain; charset=UTF-8"
+        }
+      });
+    }
+
+    const targetUrl = new URL(`/tools/${toolSlug}/index.html`, request.url);
+    const assetRequest = new Request(targetUrl.toString(), {
+      method: "GET",
+      headers: request.headers
+    });
+
+    const response = await env.ASSETS.fetch(assetRequest);
+    const headers = new Headers(response.headers);
+    headers.set("Cache-Control", "no-store");
+
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    });
+  } catch (error) {
+    console.error("Public tool access error:", error);
+    return new Response("Tool is unavailable.", {
+      status: 500,
+      headers: {
+        ...commonHeaders,
+        "Cache-Control": "no-store",
+        "Content-Type": "text/plain; charset=UTF-8"
+      }
+    });
+  }
+}
 
 function jsonResponse(
   data,

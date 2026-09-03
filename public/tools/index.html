@@ -227,107 +227,11 @@
         </div>
 
 
-        <div class="all-tools-grid">
+        <div class="all-tools-grid" id="allToolsGrid">
 
-          <!-- Image Crop Resize -->
-          <a
-            href="/tools/image-crop-resize"
-            class="all-tool-card"
-          >
-            <div class="all-tool-icon">✂️</div>
-
-            <h2>Image Crop & Resize</h2>
-
-            <p>
-              Crop and resize JPG, JPEG, PNG and WebP
-              images with custom dimensions and aspect ratios.
-            </p>
-
-            <span class="all-tool-action">
-              Start Now →
-            </span>
-          </a>
-
-
-          <!-- PDF Compressor -->
-          <a
-            href="/tools/pdf-compressor"
-            class="all-tool-card"
-          >
-            <div class="all-tool-icon">📦</div>
-
-            <h2>PDF Compressor</h2>
-
-            <p>
-              Reduce PDF file size with different compression
-              levels while keeping the document usable.
-            </p>
-
-            <span class="all-tool-action">
-              Start Now →
-            </span>
-          </a>
-
-
-          <!-- JPG PNG to PDF -->
-          <a
-            href="/tools/jpg-png-to-pdf"
-            class="all-tool-card"
-          >
-            <div class="all-tool-icon">🖼️</div>
-
-            <h2>JPG/PNG to PDF</h2>
-
-            <p>
-              Convert one or multiple JPG and PNG images
-              into a single PDF document.
-            </p>
-
-            <span class="all-tool-action">
-              Start Now →
-            </span>
-          </a>
-
-
-          <!-- Passport Photo -->
-          <a
-            href="/tools/passport-photo-maker"
-            class="all-tool-card"
-          >
-            <div class="all-tool-icon">👤</div>
-
-            <h2>Passport Photo Maker</h2>
-
-            <p>
-              Create printable passport photo sheets with
-              configurable photo size and layout.
-            </p>
-
-            <span class="all-tool-action">
-              Start Now →
-            </span>
-          </a>
-
-
-          <!-- Merge PDF -->
-          <a
-            href="/tools/merge-pdf"
-            class="all-tool-card"
-          >
-            <div class="all-tool-icon">🔗</div>
-
-            <h2>Merge PDF</h2>
-
-            <p>
-              Combine multiple PDF files into one PDF and
-              download the merged document.
-            </p>
-
-            <span class="all-tool-action">
-              Start Now →
-            </span>
-          </a>
-
+          <div class="loading-card" style="grid-column: 1 / -1;">
+            Loading tools...
+          </div>
 
         </div>
 
@@ -387,9 +291,69 @@
   </footer>
 
 
+
   <script>
     document.getElementById("currentYear").textContent =
       new Date().getFullYear();
+
+    async function loadPublicTools() {
+      const grid = document.getElementById("allToolsGrid");
+      if (!grid) return;
+
+      try {
+        const response = await fetch("/api/tools", { cache: "no-store" });
+        if (!response.ok) throw new Error("Tools request failed");
+
+        const result = await response.json();
+        if (!result.success || !Array.isArray(result.data)) {
+          throw new Error("Tools API returned an error");
+        }
+
+        const tools = result.data;
+
+        if (tools.length === 0) {
+          grid.innerHTML = `
+            <div class="privacy-note" style="grid-column: 1 / -1; margin-top: 0;">
+              <strong>🛠️ No online tools available</strong>
+              <p>Tools will appear here when enabled from the admin panel.</p>
+            </div>`;
+          return;
+        }
+
+        grid.innerHTML = tools.map((tool) => {
+          const icon = escapeHtml(tool.icon || "🛠️");
+          const name = escapeHtml(tool.name || "Online Tool");
+          const description = escapeHtml(tool.description || "Use this online tool.");
+          const slug = encodeURIComponent(String(tool.slug || ""));
+
+          return `
+            <a href="/tools/${slug}" class="all-tool-card">
+              <div class="all-tool-icon">${icon}</div>
+              <h2>${name}</h2>
+              <p>${description}</p>
+              <span class="all-tool-action">Start Now →</span>
+            </a>`;
+        }).join("");
+      } catch (error) {
+        console.error("Public tools load error:", error);
+        grid.innerHTML = `
+          <div class="privacy-note" style="grid-column: 1 / -1; margin-top: 0;">
+            <strong>⚠️ Unable to load tools</strong>
+            <p>Please refresh the page and try again.</p>
+          </div>`;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    loadPublicTools();
   </script>
 
 </body>

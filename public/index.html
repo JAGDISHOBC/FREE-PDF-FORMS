@@ -168,57 +168,8 @@
         </div>
 
 
-        <div class="tools-grid">
-
-          <a href="/tools/image-crop-resize" class="tool-card">
-            <div class="tool-icon">✂️</div>
-            <h3>Image Crop & Resize</h3>
-            <p>
-              Crop and resize JPG, PNG and WebP images.
-            </p>
-            <span>Use Tool →</span>
-          </a>
-
-
-          <a href="/tools/pdf-compressor" class="tool-card">
-            <div class="tool-icon">📦</div>
-            <h3>PDF Compressor</h3>
-            <p>
-              Reduce PDF file size while maintaining quality.
-            </p>
-            <span>Use Tool →</span>
-          </a>
-
-
-          <a href="/tools/jpg-png-to-pdf" class="tool-card">
-            <div class="tool-icon">🖼️</div>
-            <h3>JPG/PNG to PDF</h3>
-            <p>
-              Convert multiple images into a single PDF.
-            </p>
-            <span>Use Tool →</span>
-          </a>
-
-
-          <a href="/tools/passport-photo-maker" class="tool-card">
-            <div class="tool-icon">👤</div>
-            <h3>Passport Photo Maker</h3>
-            <p>
-              Create printable passport photo sheets.
-            </p>
-            <span>Use Tool →</span>
-          </a>
-
-
-          <a href="/tools/merge-pdf" class="tool-card">
-            <div class="tool-icon">🔗</div>
-            <h3>Merge PDF</h3>
-            <p>
-              Combine multiple PDF files into one document.
-            </p>
-            <span>Use Tool →</span>
-          </a>
-
+        <div id="homeToolsGrid" class="tools-grid">
+          <div class="loading-card">Loading tools...</div>
         </div>
 
       </div>
@@ -286,6 +237,60 @@
     </div>
   </footer>
 
+
+  <script>
+    (async function loadHomeTools() {
+      const container = document.getElementById("homeToolsGrid");
+      if (!container) return;
+
+      try {
+        const response = await fetch("/api/tools", { cache: "no-store" });
+        if (!response.ok) throw new Error("Tools request failed");
+
+        const result = await response.json();
+        const tools = Array.isArray(result.data) ? result.data : [];
+        const visible = tools.filter(tool =>
+          Number(tool.is_active) === 1 && Number(tool.show_on_home) === 1
+        );
+
+        if (!visible.length) {
+          container.innerHTML = `
+            <div class="empty-card">
+              <div class="empty-icon">🛠️</div>
+              <h3>No online tools available</h3>
+              <p>Tools will appear here when enabled from the admin panel.</p>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = visible.map(tool => `
+          <a href="/tools/${encodeURIComponent(tool.slug)}" class="tool-card">
+            <div class="tool-icon">${escapeHtml(tool.icon || "🛠️")}</div>
+            <h3>${escapeHtml(tool.name || "Online Tool")}</h3>
+            <p>${escapeHtml(tool.description || "Use this online tool.")}</p>
+            <span>Use Tool →</span>
+          </a>
+        `).join("");
+      } catch (error) {
+        console.error("Home tools load error:", error);
+        container.innerHTML = `
+          <div class="empty-card">
+            <div class="empty-icon">⚠️</div>
+            <h3>Unable to load online tools</h3>
+            <p>Please refresh the page and try again.</p>
+          </div>`;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+    })();
+  </script>
 
   <script src="/js/app.js"></script>
 
