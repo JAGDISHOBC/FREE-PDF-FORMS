@@ -23,7 +23,7 @@
       <div>
         <p class="eyebrow">CONTROL CENTER</p>
         <h2>Welcome, <span id="adminUsername">Admin</span> 👋</h2>
-        <p class="muted">Manage your public content safely from one place. Phase 3C adds live PDF Forms management.</p>
+        <p class="muted">Manage your public content safely from one place. Phase 3D adds Government Links management.</p>
       </div>
       <div class="status-pill">● Secure session active</div>
     </section>
@@ -144,6 +144,84 @@
           <div class="modal-actions">
             <button id="cancelFormButton" class="secondary-button" type="button">Cancel</button>
             <button id="saveFormButton" class="primary-button" type="submit">Save PDF Form</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <section class="manager-card" id="linksManager">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">EXTERNAL RESOURCES</p>
+          <h2>Government Links</h2>
+          <p class="muted">Manage useful government websites, services and official resources.</p>
+        </div>
+        <button id="addLinkButton" class="primary-button" type="button">＋ Add Government Link</button>
+      </div>
+
+      <div id="linkMessage" class="message" role="status" aria-live="polite"></div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Link</th>
+              <th>Description</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="linksBody">
+            <tr><td colspan="5" class="table-empty">Loading government links…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div id="linkModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-backdrop" data-close-link-modal="1"></div>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="linkModalTitle">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">GOVERNMENT LINK</p>
+            <h2 id="linkModalTitle">Add Government Link</h2>
+          </div>
+          <button id="closeLinkModal" class="icon-button" type="button" aria-label="Close">×</button>
+        </div>
+
+        <form id="linkForm">
+          <input type="hidden" id="linkId">
+
+          <label for="linkName">Name</label>
+          <input id="linkName" maxlength="150" required placeholder="e.g. UMANG">
+
+          <label for="linkUrl">URL</label>
+          <input id="linkUrl" type="url" maxlength="2000" required placeholder="https://example.gov.in/">
+
+          <label for="linkDescription">Description</label>
+          <textarea id="linkDescription" maxlength="500" rows="3" placeholder="Short description shown on the website"></textarea>
+
+          <div class="form-grid">
+            <div>
+              <label for="linkIcon">Icon</label>
+              <input id="linkIcon" maxlength="20" placeholder="🔗">
+            </div>
+            <div>
+              <label for="linkSort">Sort order</label>
+              <input id="linkSort" type="number" min="0" max="999999" value="1">
+            </div>
+          </div>
+
+          <label class="checkbox-row">
+            <input id="linkActive" type="checkbox" checked>
+            <span>Show this link publicly</span>
+          </label>
+
+          <div id="linkFormMessage" class="message" role="alert"></div>
+          <div class="modal-actions">
+            <button id="cancelLinkButton" class="secondary-button" type="button">Cancel</button>
+            <button id="saveLinkButton" class="primary-button" type="submit">Save Link</button>
           </div>
         </form>
       </section>

@@ -62,6 +62,7 @@
       await loadDepartments();
       await loadForms();
       await loadDepartmentOptions();
+      await loadLinks();
     } catch (error) {
       if (error.status === 401) {
         window.location.href = "/admin/login";
@@ -229,7 +230,7 @@
   });
 
   async function refreshAll() {
-    await Promise.all([refreshDashboardCounts(), loadDepartments(), loadForms($("formSearch")?.value.trim() || "")]);
+    await Promise.all([refreshDashboardCounts(), loadDepartments(), loadForms($("formSearch")?.value.trim() || ""), loadLinks()]);
   }
 
   async function refreshDashboardCounts() {
@@ -421,6 +422,152 @@
       await refreshAll();
     } catch (error) {
       showMessage($("formFormMessage"), error.message || "Unable to save PDF form.");
+    } finally {
+      save.disabled = false;
+    }
+  });
+
+
+
+  async function loadLinks() {
+    const body = $("linksBody");
+    if (!body) return;
+    try {
+      const result = await api("/api/admin/links");
+      renderLinks(result.data.links || []);
+    } catch (error) {
+      if (error.status === 401) {
+        window.location.href = "/admin/login";
+        return;
+      }
+      body.innerHTML = `<tr><td colspan="5" class="table-empty">${escapeHtml(error.message || "Unable to load government links.")}</td></tr>`;
+    }
+  }
+
+  function renderLinks(links) {
+    const body = $("linksBody");
+    if (!body) return;
+    if (!links.length) {
+      body.innerHTML = `<tr><td colspan="5" class="table-empty">No government links found.</td></tr>`;
+      return;
+    }
+
+    body.innerHTML = links.map((link) => {
+      const active = Number(link.is_active) === 1;
+      const safeId = Number(link.id);
+      const href = String(link.url || "#");
+      return `<tr>
+        <td><span class="order-badge">${escapeHtml(link.sort_order)}</span></td>
+        <td><div class="dept-name"><span class="dept-icon">${escapeHtml(link.icon || "🔗")}</span><div><strong>${escapeHtml(link.name)}</strong><div class="muted table-subtext link-url-cell">${escapeHtml(href)}</div></div></div></td>
+        <td><span class="description-cell">${escapeHtml(link.description || "—")}</span></td>
+        <td><span class="status-badge ${active ? "active" : "inactive"}">${active ? "Active" : "Inactive"}</span></td>
+        <td class="action-group">
+          <a class="secondary-button mini" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">Open</a>
+          <button class="secondary-button mini" data-link-action="edit" data-id="${safeId}" type="button">Edit</button>
+          <button class="secondary-button mini" data-link-action="toggle" data-id="${safeId}" type="button">${active ? "Disable" : "Enable"}</button>
+          <button class="danger-button mini" data-link-action="delete" data-id="${safeId}" type="button">Delete</button>
+        </td>
+      </tr>`;
+    }).join("");
+  }
+
+  async function getAdminLink(id) {
+    const result = await api(`/api/admin/links/${id}`);
+    return result.data.link;
+  }
+
+  function openLinkModal(link = null) {
+    $("linkId").value = link?.id || "";
+    $("linkName").value = link?.name || "";
+    $("linkUrl").value = link?.url || "";
+    $("linkDescription").value = link?.description || "";
+    $("linkIcon").value = link?.icon || "";
+    $("linkSort").value = Number(link?.sort_order || 1);
+    $("linkActive").checked = link ? Number(link.is_active) === 1 : true;
+    $("linkModalTitle").textContent = link ? "Edit Government Link" : "Add Government Link";
+    showMessage($("linkFormMessage"), "");
+    $("linkModal").classList.remove("hidden");
+    $("linkModal").setAttribute("aria-hidden", "false");
+    setTimeout(() => $("linkName").focus(), 0);
+  }
+
+  function closeLinkModal() {
+    $("linkModal")?.classList.add("hidden");
+    $("linkModal")?.setAttribute("aria-hidden", "true");
+  }
+
+  $("addLinkButton")?.addEventListener("click", () => openLinkModal());
+  $("closeLinkModal")?.addEventListener("click", closeLinkModal);
+  $("cancelLinkButton")?.addEventListener("click", closeLinkModal);
+  $("linkModal")?.addEventListener("click", (event) => {
+    if (event.target.dataset.closeLinkModal) closeLinkModal();
+  });
+
+  $("linksBody")?.addEventListener("click", async (event) => {
+    const button = event.target.closest("button[data-link-action]");
+    if (!button) return;
+    const id = Number(button.dataset.id);
+    const action = button.dataset.linkAction;
+    if (!id) return;
+
+    try {
+      const link = await getAdminLink(id);
+      if (action === "edit") {
+        openLinkModal(link);
+        return;
+      }
+      if (action === "toggle") {
+        await api(`/api/admin/links/${id}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            name: link.name,
+            url: link.url,
+            description: link.description || "",
+            icon: link.icon || "",
+            sort_order: link.sort_order,
+            is_active: Number(link.is_active) === 1 ? 0 : 1
+          })
+        });
+        showMessage($("linkMessage"), "Government link status updated.", "success");
+        await refreshAll();
+        return;
+      }
+      if (action === "delete") {
+        if (!window.confirm(`Delete “${link.name}”? This cannot be undone.`)) return;
+        await api(`/api/admin/links/${id}`, { method: "DELETE" });
+        showMessage($("linkMessage"), "Government link deleted.", "success");
+        await refreshAll();
+      }
+    } catch (error) {
+      showMessage($("linkMessage"), error.message || "Action failed.");
+    }
+  });
+
+  $("linkForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const save = $("saveLinkButton");
+    const id = $("linkId").value.trim();
+    const payload = {
+      name: $("linkName").value.trim(),
+      url: $("linkUrl").value.trim(),
+      description: $("linkDescription").value.trim(),
+      icon: $("linkIcon").value.trim(),
+      sort_order: Number($("linkSort").value || 0),
+      is_active: $("linkActive").checked ? 1 : 0
+    };
+
+    save.disabled = true;
+    showMessage($("linkFormMessage"), "Saving…", "success");
+    try {
+      await api(id ? `/api/admin/links/${id}` : "/api/admin/links", {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify(payload)
+      });
+      closeLinkModal();
+      showMessage($("linkMessage"), id ? "Government link updated successfully." : "Government link added successfully.", "success");
+      await refreshAll();
+    } catch (error) {
+      showMessage($("linkFormMessage"), error.message || "Unable to save government link.");
     } finally {
       save.disabled = false;
     }

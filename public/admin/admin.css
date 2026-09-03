@@ -68,3 +68,5 @@ button{font:inherit}
 .danger-button { border: 1px solid #d66; background: #fff; color: #b42318; border-radius: 8px; cursor: pointer; }
 .status-badge.active { color: #087443; }
 .status-badge.inactive { color: #8a5a00; }
+
+.link-url-cell{max-width:280px;overflow-wrap:anywhere}

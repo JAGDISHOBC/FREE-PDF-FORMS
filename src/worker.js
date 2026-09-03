@@ -178,6 +178,32 @@ export default {
         return await handleAdminFormCreate(request, env, commonHeaders);
       }
 
+      if (path === "/api/admin/links" && request.method === "GET") {
+        return await handleAdminLinksList(request, env, commonHeaders);
+      }
+
+      if (path === "/api/admin/links" && request.method === "POST") {
+        return await handleAdminLinkCreate(request, env, commonHeaders);
+      }
+
+      const adminLinkMatch = path.match(/^\/api\/admin\/links\/([0-9]+)$/);
+
+      if (adminLinkMatch) {
+        const linkId = Number(adminLinkMatch[1]);
+
+        if (request.method === "GET") {
+          return await handleAdminLinkGet(request, env, commonHeaders, linkId);
+        }
+
+        if (request.method === "PUT") {
+          return await handleAdminLinkUpdate(request, env, commonHeaders, linkId);
+        }
+
+        if (request.method === "DELETE") {
+          return await handleAdminLinkDelete(request, env, commonHeaders, linkId);
+        }
+      }
+
       const adminFormMatch = path.match(/^\/api\/admin\/forms\/([0-9]+)$/);
 
       if (adminFormMatch) {
@@ -826,6 +852,194 @@ async function handleAdminDepartmentDelete(request, env, commonHeaders, departme
       success: false,
       error: "Unable to delete department."
     }, 500, commonHeaders);
+  }
+}
+
+async function handleAdminLinksList(request, env, commonHeaders) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+
+  try {
+    const result = await env.DB.prepare(`
+      SELECT id, name, url, description, icon, sort_order, is_active, created_at, updated_at
+      FROM government_links
+      ORDER BY sort_order ASC, id ASC
+    `).all();
+
+    return jsonResponse({
+      success: true,
+      data: { links: result.results || [] }
+    }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin government links list error:", error);
+    return jsonResponse({ success: false, error: "Unable to load government links." }, 500, commonHeaders);
+  }
+}
+
+async function readAdminLinkPayload(request) {
+  const contentType = request.headers.get("Content-Type") || "";
+  if (!contentType.includes("application/json")) return { error: "JSON request body is required." };
+
+  let body;
+  try { body = await request.json(); } catch { return { error: "Invalid JSON request." }; }
+
+  const name = String(body?.name ?? "").trim();
+  const url = String(body?.url ?? "").trim();
+  const description = String(body?.description ?? "").trim();
+  const icon = String(body?.icon ?? "").trim();
+  const sort_order = Number.isFinite(Number(body?.sort_order)) ? Math.trunc(Number(body.sort_order)) : 0;
+  const is_active = body?.is_active === false || body?.is_active === 0 || body?.is_active === "0" ? 0 : 1;
+
+  if (!name) return { error: "Link name is required." };
+  if (name.length > 150) return { error: "Link name must be 150 characters or fewer." };
+  if (!url) return { error: "URL is required." };
+  if (url.length > 2000) return { error: "URL must be 2000 characters or fewer." };
+  if (description.length > 500) return { error: "Description must be 500 characters or fewer." };
+  if (icon.length > 20) return { error: "Icon must be 20 characters or fewer." };
+  if (sort_order < 0 || sort_order > 999999) return { error: "Sort order must be between 0 and 999999." };
+
+  let parsed;
+  try { parsed = new URL(url); } catch { return { error: "Enter a valid URL." }; }
+  if (!(parsed.protocol === "https:" || parsed.protocol === "http:")) {
+    return { error: "Only http:// and https:// URLs are allowed." };
+  }
+  if (!parsed.hostname) return { error: "Enter a valid URL." };
+
+  return { data: { name, url: parsed.toString(), description, icon, sort_order, is_active } };
+}
+
+async function handleAdminLinkCreate(request, env, commonHeaders) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+
+  try {
+    const payload = await readAdminLinkPayload(request);
+    if (payload.error) return jsonResponse({ success: false, error: payload.error }, 400, commonHeaders);
+
+    const duplicate = await env.DB.prepare(`
+      SELECT id FROM government_links
+      WHERE lower(name) = lower(?) OR lower(url) = lower(?)
+      LIMIT 1
+    `).bind(payload.data.name, payload.data.url).first();
+
+    if (duplicate) {
+      return jsonResponse({
+        success: false,
+        code: "DUPLICATE_LINK",
+        error: "A government link with the same name or URL already exists."
+      }, 409, commonHeaders);
+    }
+
+    const result = await env.DB.prepare(`
+      INSERT INTO government_links (name, url, description, icon, sort_order, is_active)
+      VALUES (?, ?, ?, ?, ?, ?)
+      RETURNING id, name, url, description, icon, sort_order, is_active, created_at, updated_at
+    `).bind(
+      payload.data.name,
+      payload.data.url,
+      payload.data.description,
+      payload.data.icon,
+      payload.data.sort_order,
+      payload.data.is_active
+    ).first();
+
+    return jsonResponse({
+      success: true,
+      message: "Government link created successfully.",
+      data: { link: result }
+    }, 201, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin government link create error:", error);
+    return jsonResponse({ success: false, error: "Unable to create government link." }, 500, commonHeaders);
+  }
+}
+
+async function handleAdminLinkGet(request, env, commonHeaders, linkId) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+  if (!Number.isInteger(linkId) || linkId < 1) return jsonResponse({ success: false, error: "Invalid link ID." }, 400, commonHeaders);
+
+  try {
+    const link = await env.DB.prepare(`
+      SELECT id, name, url, description, icon, sort_order, is_active, created_at, updated_at
+      FROM government_links WHERE id = ? LIMIT 1
+    `).bind(linkId).first();
+
+    if (!link) return jsonResponse({ success: false, code: "NOT_FOUND", error: "Government link not found." }, 404, commonHeaders);
+    return jsonResponse({ success: true, data: { link } }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin government link get error:", error);
+    return jsonResponse({ success: false, error: "Unable to load government link." }, 500, commonHeaders);
+  }
+}
+
+async function handleAdminLinkUpdate(request, env, commonHeaders, linkId) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+  if (!Number.isInteger(linkId) || linkId < 1) return jsonResponse({ success: false, error: "Invalid link ID." }, 400, commonHeaders);
+
+  try {
+    const payload = await readAdminLinkPayload(request);
+    if (payload.error) return jsonResponse({ success: false, error: payload.error }, 400, commonHeaders);
+
+    const existing = await env.DB.prepare(`SELECT id FROM government_links WHERE id = ? LIMIT 1`).bind(linkId).first();
+    if (!existing) return jsonResponse({ success: false, code: "NOT_FOUND", error: "Government link not found." }, 404, commonHeaders);
+
+    const duplicate = await env.DB.prepare(`
+      SELECT id FROM government_links
+      WHERE (lower(name) = lower(?) OR lower(url) = lower(?)) AND id != ?
+      LIMIT 1
+    `).bind(payload.data.name, payload.data.url, linkId).first();
+
+    if (duplicate) {
+      return jsonResponse({
+        success: false,
+        code: "DUPLICATE_LINK",
+        error: "A government link with the same name or URL already exists."
+      }, 409, commonHeaders);
+    }
+
+    const result = await env.DB.prepare(`
+      UPDATE government_links
+      SET name = ?, url = ?, description = ?, icon = ?, sort_order = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      RETURNING id, name, url, description, icon, sort_order, is_active, created_at, updated_at
+    `).bind(
+      payload.data.name,
+      payload.data.url,
+      payload.data.description,
+      payload.data.icon,
+      payload.data.sort_order,
+      payload.data.is_active,
+      linkId
+    ).first();
+
+    return jsonResponse({
+      success: true,
+      message: "Government link updated successfully.",
+      data: { link: result }
+    }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin government link update error:", error);
+    return jsonResponse({ success: false, error: "Unable to update government link." }, 500, commonHeaders);
+  }
+}
+
+async function handleAdminLinkDelete(request, env, commonHeaders, linkId) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+  if (!Number.isInteger(linkId) || linkId < 1) return jsonResponse({ success: false, error: "Invalid link ID." }, 400, commonHeaders);
+
+  try {
+    const existing = await env.DB.prepare(`SELECT id, name FROM government_links WHERE id = ? LIMIT 1`).bind(linkId).first();
+    if (!existing) return jsonResponse({ success: false, code: "NOT_FOUND", error: "Government link not found." }, 404, commonHeaders);
+
+    await env.DB.prepare(`DELETE FROM government_links WHERE id = ?`).bind(linkId).run();
+
+    return jsonResponse({ success: true, message: "Government link deleted successfully." }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin government link delete error:", error);
+    return jsonResponse({ success: false, error: "Unable to delete government link." }, 500, commonHeaders);
   }
 }
 
