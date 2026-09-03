@@ -40,3 +40,31 @@ button{font:inherit}
 .module b{display:block;font-size:14px}
 .module span{display:block;margin-top:6px;color:#64748b;font-size:12px;line-height:1.45}
 @media(max-width:760px){.admin-topbar,.welcome-card{align-items:flex-start;flex-direction:column}.stats-grid,.module-grid{grid-template-columns:1fr}.top-actions{width:100%}.top-actions a,.secondary-button{flex:1;justify-content:center}}
+
+.section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.manager-card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:26px;box-shadow:0 8px 30px rgba(15,23,42,.04);margin-top:18px}
+.primary-button{min-height:42px;padding:0 16px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.primary-button:hover{background:#1d4ed8}
+.primary-button:disabled{opacity:.65;cursor:wait}
+.table-wrap{overflow-x:auto;margin-top:16px;border:1px solid #e2e8f0;border-radius:14px}
+.data-table{width:100%;border-collapse:collapse;min-width:880px}
+.data-table th{background:#f8fafc;color:#64748b;font-size:12px;text-align:left;padding:12px 14px;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+.data-table td{padding:14px;border-bottom:1px solid #eef2f7;font-size:13px;vertical-align:middle}
+.data-table tbody tr:last-child td{border-bottom:0}
+.table-empty{text-align:center;color:#64748b;padding:28px!important}
+.order-badge{display:inline-flex;min-width:32px;height:30px;padding:0 8px;align-items:center;justify-content:center;border-radius:8px;background:#eff6ff;color:#1d4ed8;font-weight:800}
+.dept-name{display:flex;align-items:center;gap:10px;min-width:190px}.dept-icon{font-size:20px}.description-cell{color:#64748b;display:block;max-width:280px;line-height:1.45}
+.status-badge{display:inline-flex;align-items:center;border-radius:999px;padding:6px 9px;font-size:11px;font-weight:800}.status-badge.active{background:#ecfdf3;color:#15803d}.status-badge.inactive{background:#fff7ed;color:#c2410c}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap}.small-button{height:32px;padding:0 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;font-size:12px;font-weight:700;cursor:pointer}.small-button:hover{background:#f8fafc}.small-button.danger{color:#b42318;border-color:#fecaca}.small-button.danger:hover{background:#fef2f2}
+.modal{position:fixed;inset:0;display:grid;place-items:center;padding:20px;z-index:1000}.modal.hidden{display:none}.modal-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.46)}.modal-card{position:relative;width:min(560px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border-radius:18px;padding:24px;box-shadow:0 24px 80px rgba(15,23,42,.24)}
+.modal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:15px}.modal-header h2{margin-bottom:0}.icon-button{width:36px;height:36px;border:1px solid #cbd5e1;background:#fff;border-radius:9px;font-size:24px;line-height:1;cursor:pointer;color:#475569}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.modal-card textarea{width:100%;padding:11px 13px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#172033;font:inherit;resize:vertical;outline:none}.modal-card textarea:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}.checkbox-row{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;margin-top:18px}.checkbox-row input{width:17px;height:17px;margin:0}.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}.modal-actions .secondary-button{min-width:100px;justify-content:center}.modal-actions .primary-button{min-width:150px}
+@media(max-width:760px){.section-heading{flex-direction:column}.section-heading .primary-button{width:100%}.form-grid{grid-template-columns:1fr}.modal-card{padding:20px}.modal-actions{flex-direction:column-reverse}.modal-actions button{width:100%}}
+
+.toolbar-row { margin: 0 0 14px; display: flex; gap: 10px; }
+.toolbar-row input[type="search"] { width: min(520px, 100%); }
+.table-subtext { margin-top: 3px; font-size: 12px; }
+.action-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.mini { padding: 7px 10px; font-size: 12px; text-decoration: none; }
+.danger-button { border: 1px solid #d66; background: #fff; color: #b42318; border-radius: 8px; cursor: pointer; }
+.status-badge.active { color: #087443; }
+.status-badge.inactive { color: #8a5a00; }

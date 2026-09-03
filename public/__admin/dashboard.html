@@ -23,7 +23,7 @@
       <div>
         <p class="eyebrow">CONTROL CENTER</p>
         <h2>Welcome, <span id="adminUsername">Admin</span> 👋</h2>
-        <p class="muted">Manage your public content safely from one place. Phase 3B adds live Departments management.</p>
+        <p class="muted">Manage your public content safely from one place. Phase 3C adds live PDF Forms management.</p>
       </div>
       <div class="status-pill">● Secure session active</div>
     </section>
@@ -64,6 +64,90 @@
         </table>
       </div>
     </section>
+
+    <section class="manager-card" id="formsManager">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">PDF LIBRARY</p>
+          <h2>PDF Forms</h2>
+          <p class="muted">Upload, edit, preview, download, activate/deactivate and delete your PDF forms.</p>
+        </div>
+        <button id="addFormButton" class="primary-button" type="button">＋ Add PDF Form</button>
+      </div>
+
+      <div class="toolbar-row">
+        <input id="formSearch" type="search" placeholder="Search forms, filenames or departments" autocomplete="off">
+      </div>
+      <div id="formMessage" class="message" role="status" aria-live="polite"></div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Form</th>
+              <th>Department</th>
+              <th>File</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="formsBody">
+            <tr><td colspan="6" class="table-empty">Loading PDF forms…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div id="formModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-backdrop" data-close-form-modal="1"></div>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="formModalTitle">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">PDF FORM</p>
+            <h2 id="formModalTitle">Add PDF Form</h2>
+          </div>
+          <button id="closeFormModal" class="icon-button" type="button" aria-label="Close">×</button>
+        </div>
+
+        <form id="formForm" enctype="multipart/form-data">
+          <input type="hidden" id="formId">
+
+          <label for="formDepartment">Department</label>
+          <select id="formDepartment" required></select>
+
+          <label for="formName">Form name</label>
+          <input id="formName" maxlength="200" required placeholder="e.g. School Admission Form">
+
+          <label for="formDescription">Description</label>
+          <textarea id="formDescription" maxlength="1000" rows="3" placeholder="Short description shown on the website"></textarea>
+
+          <label for="formPdfFile">PDF file <span id="formFileHint" class="muted">(required for new forms)</span></label>
+          <input id="formPdfFile" type="file" accept="application/pdf,.pdf">
+          <div id="currentFormFile" class="message"></div>
+
+          <div class="form-grid">
+            <div>
+              <label for="formSort">Sort order</label>
+              <input id="formSort" type="number" min="0" max="999999" value="1">
+            </div>
+            <div>
+              <label for="formActive">Status</label>
+              <label class="checkbox-row">
+                <input id="formActive" type="checkbox" checked>
+                <span>Show this form publicly</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="formFormMessage" class="message" role="alert"></div>
+          <div class="modal-actions">
+            <button id="cancelFormButton" class="secondary-button" type="button">Cancel</button>
+            <button id="saveFormButton" class="primary-button" type="submit">Save PDF Form</button>
+          </div>
+        </form>
+      </section>
+    </div>
 
     <div id="departmentModal" class="modal hidden" aria-hidden="true">
       <div class="modal-backdrop" data-close-modal="1"></div>

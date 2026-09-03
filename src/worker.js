@@ -170,6 +170,32 @@ export default {
         return await handleAdminDepartmentCreate(request, env, commonHeaders);
       }
 
+      if (path === "/api/admin/forms" && request.method === "GET") {
+        return await handleAdminFormsList(request, env, commonHeaders, url);
+      }
+
+      if (path === "/api/admin/forms" && request.method === "POST") {
+        return await handleAdminFormCreate(request, env, commonHeaders);
+      }
+
+      const adminFormMatch = path.match(/^\/api\/admin\/forms\/([0-9]+)$/);
+
+      if (adminFormMatch) {
+        const formId = Number(adminFormMatch[1]);
+
+        if (request.method === "GET") {
+          return await handleAdminFormGet(request, env, commonHeaders, formId);
+        }
+
+        if (request.method === "PUT") {
+          return await handleAdminFormUpdate(request, env, commonHeaders, formId);
+        }
+
+        if (request.method === "DELETE") {
+          return await handleAdminFormDelete(request, env, commonHeaders, formId);
+        }
+      }
+
       const adminDepartmentMatch = path.match(/^\/api\/admin\/departments\/([0-9]+)$/);
 
       if (adminDepartmentMatch) {
@@ -1744,6 +1770,335 @@ function base64ToUint8Array(base64) {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
+}
+
+const ADMIN_FORM_MAX_BYTES = 25 * 1024 * 1024;
+
+function cleanPdfFilename(filename) {
+  const raw = String(filename || "document.pdf").trim() || "document.pdf";
+  const noPath = raw.replace(/[\\/]+/g, "-");
+  const cleaned = noPath.replace(/[^a-zA-Z0-9._ -]/g, "_").replace(/\s+/g, " ").trim();
+  return cleaned.slice(-160) || "document.pdf";
+}
+
+function isPdfUpload(file) {
+  if (!file || typeof file.arrayBuffer !== "function") return false;
+  const type = String(file.type || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+  return type === "application/pdf" || name.endsWith(".pdf");
+}
+
+async function requireAdmin(request, env, commonHeaders) {
+  const session = await getAdminSession(request, env);
+  if (!session) {
+    return jsonResponse({
+      success: false,
+      code: "UNAUTHORIZED",
+      error: "Admin login required."
+    }, 401, commonHeaders);
+  }
+  return null;
+}
+
+async function handleAdminFormsList(request, env, commonHeaders, url) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+
+  try {
+    const search = String(url.searchParams.get("search") || "").trim();
+    const params = [];
+    let where = "";
+
+    if (search) {
+      where = `WHERE lower(f.name) LIKE lower(?) OR lower(COALESCE(f.description, '')) LIKE lower(?) OR lower(f.original_filename) LIKE lower(?) OR lower(d.name) LIKE lower(?)`;
+      const q = `%${search.slice(0, 120)}%`;
+      params.push(q, q, q, q);
+    }
+
+    const sql = `
+      SELECT
+        f.id,
+        f.department_id,
+        d.name AS department_name,
+        f.name,
+        f.description,
+        f.r2_key,
+        f.original_filename,
+        f.file_size,
+        f.mime_type,
+        f.sort_order,
+        f.is_active,
+        f.created_at,
+        f.updated_at
+      FROM forms f
+      INNER JOIN departments d ON d.id = f.department_id
+      ${where}
+      ORDER BY d.sort_order ASC, f.sort_order ASC, f.id ASC
+      LIMIT 500
+    `;
+
+    const result = await env.DB.prepare(sql).bind(...params).all();
+
+    return jsonResponse({
+      success: true,
+      data: { forms: result.results || [] }
+    }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin forms list error:", error);
+    return jsonResponse({ success: false, error: "Unable to load PDF forms." }, 500, commonHeaders);
+  }
+}
+
+async function parseAdminFormMultipart(request) {
+  const contentLength = Number(request.headers.get("Content-Length") || 0);
+  if (contentLength && contentLength > ADMIN_FORM_MAX_BYTES + 2 * 1024 * 1024) {
+    return { error: "Request is too large. Maximum PDF size is 25 MB." };
+  }
+
+  const contentType = request.headers.get("Content-Type") || "";
+  if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+    return { error: "Multipart form data is required." };
+  }
+
+  let formData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return { error: "Unable to read uploaded form data." };
+  }
+
+  const name = String(formData.get("name") || "").trim();
+  const description = String(formData.get("description") || "").trim();
+  const departmentId = Number(formData.get("department_id"));
+  const sortRaw = formData.get("sort_order");
+  const sortOrder = Number.isFinite(Number(sortRaw)) ? Math.trunc(Number(sortRaw)) : 0;
+  const isActiveValue = formData.get("is_active");
+  const isActive = isActiveValue === "0" || isActiveValue === "false" || isActiveValue === false ? 0 : 1;
+  const file = formData.get("pdf_file");
+
+  if (!name) return { error: "Form name is required." };
+  if (name.length > 200) return { error: "Form name must be 200 characters or fewer." };
+  if (description.length > 1000) return { error: "Description must be 1000 characters or fewer." };
+  if (!Number.isInteger(departmentId) || departmentId < 1) return { error: "Please select a valid department." };
+  if (sortOrder < 0 || sortOrder > 999999) return { error: "Sort order must be between 0 and 999999." };
+
+  let upload = null;
+  if (file && typeof file.arrayBuffer === "function" && Number(file.size || 0) > 0) {
+    if (Number(file.size) > ADMIN_FORM_MAX_BYTES) return { error: "PDF is too large. Maximum allowed size is 25 MB." };
+    if (!isPdfUpload(file)) return { error: "Only PDF files are allowed." };
+    upload = file;
+  }
+
+  return {
+    data: {
+      departmentId,
+      name,
+      description,
+      sortOrder,
+      isActive,
+      upload
+    }
+  };
+}
+
+async function ensureAdminFormDepartment(env, departmentId) {
+  return await env.DB.prepare(`SELECT id FROM departments WHERE id = ? LIMIT 1`).bind(departmentId).first();
+}
+
+function makePdfR2Key(fileName) {
+  const safe = cleanPdfFilename(fileName).replace(/\.pdf$/i, "") || "document";
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const unique = crypto.randomUUID();
+  return `pdfs/${year}/${month}/${unique}-${safe}.pdf`;
+}
+
+async function handleAdminFormCreate(request, env, commonHeaders) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+  if (!env.PDF_BUCKET) return jsonResponse({ success: false, error: "PDF storage is not configured." }, 500, commonHeaders);
+
+  let uploadedKey = null;
+
+  try {
+    const payload = await parseAdminFormMultipart(request);
+    if (payload.error) return jsonResponse({ success: false, error: payload.error }, 400, commonHeaders);
+
+    const department = await ensureAdminFormDepartment(env, payload.data.departmentId);
+    if (!department) return jsonResponse({ success: false, error: "Selected department does not exist." }, 400, commonHeaders);
+    if (!payload.data.upload) return jsonResponse({ success: false, error: "Please choose a PDF file." }, 400, commonHeaders);
+
+    uploadedKey = makePdfR2Key(payload.data.upload.name);
+    await env.PDF_BUCKET.put(uploadedKey, payload.data.upload.stream(), {
+      httpMetadata: { contentType: "application/pdf" },
+      customMetadata: { originalFilename: cleanPdfFilename(payload.data.upload.name) }
+    });
+
+    const fileSize = Number(payload.data.upload.size || 0);
+    const originalFilename = cleanPdfFilename(payload.data.upload.name);
+
+    const result = await env.DB.prepare(`
+      INSERT INTO forms (
+        department_id, name, description, r2_key, original_filename,
+        file_size, mime_type, sort_order, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      RETURNING id, department_id, name, description, r2_key, original_filename,
+                file_size, mime_type, sort_order, is_active, created_at, updated_at
+    `).bind(
+      payload.data.departmentId,
+      payload.data.name,
+      payload.data.description,
+      uploadedKey,
+      originalFilename,
+      fileSize,
+      "application/pdf",
+      payload.data.sortOrder,
+      payload.data.isActive
+    ).first();
+
+    return jsonResponse({
+      success: true,
+      message: "PDF form uploaded successfully.",
+      data: { form: result }
+    }, 201, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    if (uploadedKey) {
+      try { await env.PDF_BUCKET.delete(uploadedKey); } catch (cleanupError) { console.error("R2 cleanup after form create failure failed:", cleanupError); }
+    }
+    console.error("Admin form create error:", error);
+    return jsonResponse({ success: false, error: "Unable to upload PDF form." }, 500, commonHeaders);
+  }
+}
+
+async function getAdminFormRecord(env, formId) {
+  return await env.DB.prepare(`
+    SELECT f.*, d.name AS department_name
+    FROM forms f
+    INNER JOIN departments d ON d.id = f.department_id
+    WHERE f.id = ?
+    LIMIT 1
+  `).bind(formId).first();
+}
+
+async function handleAdminFormGet(request, env, commonHeaders, formId) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+  if (!Number.isInteger(formId) || formId < 1) return jsonResponse({ success: false, error: "Invalid form ID." }, 400, commonHeaders);
+
+  try {
+    const form = await getAdminFormRecord(env, formId);
+    if (!form) return jsonResponse({ success: false, code: "NOT_FOUND", error: "PDF form not found." }, 404, commonHeaders);
+    return jsonResponse({ success: true, data: { form } }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin form get error:", error);
+    return jsonResponse({ success: false, error: "Unable to load PDF form." }, 500, commonHeaders);
+  }
+}
+
+async function handleAdminFormUpdate(request, env, commonHeaders, formId) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+  if (!Number.isInteger(formId) || formId < 1) return jsonResponse({ success: false, error: "Invalid form ID." }, 400, commonHeaders);
+  if (!env.PDF_BUCKET) return jsonResponse({ success: false, error: "PDF storage is not configured." }, 500, commonHeaders);
+
+  let newKey = null;
+  try {
+    const existing = await getAdminFormRecord(env, formId);
+    if (!existing) return jsonResponse({ success: false, code: "NOT_FOUND", error: "PDF form not found." }, 404, commonHeaders);
+
+    const payload = await parseAdminFormMultipart(request);
+    if (payload.error) return jsonResponse({ success: false, error: payload.error }, 400, commonHeaders);
+
+    const department = await ensureAdminFormDepartment(env, payload.data.departmentId);
+    if (!department) return jsonResponse({ success: false, error: "Selected department does not exist." }, 400, commonHeaders);
+
+    let r2Key = existing.r2_key;
+    let originalFilename = existing.original_filename;
+    let fileSize = Number(existing.file_size || 0);
+
+    if (payload.data.upload) {
+      newKey = makePdfR2Key(payload.data.upload.name);
+      await env.PDF_BUCKET.put(newKey, payload.data.upload.stream(), {
+        httpMetadata: { contentType: "application/pdf" },
+        customMetadata: { originalFilename: cleanPdfFilename(payload.data.upload.name) }
+      });
+      r2Key = newKey;
+      originalFilename = cleanPdfFilename(payload.data.upload.name);
+      fileSize = Number(payload.data.upload.size || 0);
+    }
+
+    const result = await env.DB.prepare(`
+      UPDATE forms
+      SET department_id = ?,
+          name = ?,
+          description = ?,
+          r2_key = ?,
+          original_filename = ?,
+          file_size = ?,
+          mime_type = 'application/pdf',
+          sort_order = ?,
+          is_active = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      RETURNING id, department_id, name, description, r2_key, original_filename,
+                file_size, mime_type, sort_order, is_active, created_at, updated_at
+    `).bind(
+      payload.data.departmentId,
+      payload.data.name,
+      payload.data.description,
+      r2Key,
+      originalFilename,
+      fileSize,
+      payload.data.sortOrder,
+      payload.data.isActive,
+      formId
+    ).first();
+
+    if (newKey && existing.r2_key && existing.r2_key !== newKey) {
+      try { await env.PDF_BUCKET.delete(existing.r2_key); } catch (cleanupError) { console.error("Old R2 PDF cleanup after update failed:", cleanupError); }
+    }
+
+    return jsonResponse({ success: true, message: "PDF form updated successfully.", data: { form: result } }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    if (newKey) {
+      try { await env.PDF_BUCKET.delete(newKey); } catch (cleanupError) { console.error("R2 cleanup after form update failure failed:", cleanupError); }
+    }
+    console.error("Admin form update error:", error);
+    return jsonResponse({ success: false, error: "Unable to update PDF form." }, 500, commonHeaders);
+  }
+}
+
+async function handleAdminFormDelete(request, env, commonHeaders, formId) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+  if (!Number.isInteger(formId) || formId < 1) return jsonResponse({ success: false, error: "Invalid form ID." }, 400, commonHeaders);
+
+  try {
+    const existing = await getAdminFormRecord(env, formId);
+    if (!existing) return jsonResponse({ success: false, code: "NOT_FOUND", error: "PDF form not found." }, 404, commonHeaders);
+
+    await env.DB.prepare(`DELETE FROM forms WHERE id = ?`).bind(formId).run();
+
+    let storageWarning = "";
+    if (existing.r2_key && env.PDF_BUCKET) {
+      try {
+        await env.PDF_BUCKET.delete(existing.r2_key);
+      } catch (storageError) {
+        console.error("R2 delete after form deletion failed:", storageError);
+        storageWarning = " The database record was deleted, but the R2 file could not be removed automatically.";
+      }
+    }
+
+    return jsonResponse({
+      success: true,
+      message: `PDF form deleted successfully.${storageWarning}`,
+      warning: storageWarning || undefined
+    }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin form delete error:", error);
+    return jsonResponse({ success: false, error: "Unable to delete PDF form." }, 500, commonHeaders);
+  }
 }
 
 async function sha256Hex(value) {

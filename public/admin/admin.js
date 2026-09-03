@@ -60,6 +60,8 @@
       $("formCount").textContent = result.data.forms;
       $("linkCount").textContent = result.data.governmentLinks;
       await loadDepartments();
+      await loadForms();
+      await loadDepartmentOptions();
     } catch (error) {
       if (error.status === 401) {
         window.location.href = "/admin/login";
@@ -227,7 +229,7 @@
   });
 
   async function refreshAll() {
-    await Promise.all([refreshDashboardCounts(), loadDepartments()]);
+    await Promise.all([refreshDashboardCounts(), loadDepartments(), loadForms($("formSearch")?.value.trim() || "")]);
   }
 
   async function refreshDashboardCounts() {
@@ -236,6 +238,193 @@
     $("formCount").textContent = result.data.forms;
     $("linkCount").textContent = result.data.governmentLinks;
   }
+
+
+  async function loadForms(search = "") {
+    const body = $("formsBody");
+    if (!body) return;
+    try {
+      const query = search ? `?search=${encodeURIComponent(search)}` : "";
+      const result = await api(`/api/admin/forms${query}`);
+      renderForms(result.data.forms || []);
+    } catch (error) {
+      if (error.status === 401) {
+        window.location.href = "/admin/login";
+        return;
+      }
+      body.innerHTML = `<tr><td colspan="6" class="table-empty">${escapeHtml(error.message || "Unable to load PDF forms.")}</td></tr>`;
+    }
+  }
+
+  function formatBytes(bytes) {
+    const value = Number(bytes || 0);
+    if (!value) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    let size = value;
+    let index = 0;
+    while (size >= 1024 && index < units.length - 1) {
+      size /= 1024;
+      index++;
+    }
+    return `${size.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+  }
+
+  function renderForms(forms) {
+    const body = $("formsBody");
+    if (!forms.length) {
+      body.innerHTML = `<tr><td colspan="6" class="table-empty">No PDF forms found.</td></tr>`;
+      return;
+    }
+
+    body.innerHTML = forms.map((form) => {
+      const active = Number(form.is_active) === 1;
+      const safeId = Number(form.id);
+      return `<tr>
+        <td>${escapeHtml(form.sort_order)}</td>
+        <td><strong>${escapeHtml(form.name)}</strong><div class="muted table-subtext">${escapeHtml(form.description || "")}</div></td>
+        <td>${escapeHtml(form.department_name || "")}</td>
+        <td><div>${escapeHtml(form.original_filename || "PDF")}</div><div class="muted table-subtext">${formatBytes(form.file_size)}</div></td>
+        <td><span class="status-badge ${active ? "active" : "inactive"}">${active ? "Active" : "Inactive"}</span></td>
+        <td class="action-group">
+          <a class="secondary-button mini" href="/pdf/${safeId}" target="_blank" rel="noopener">Preview</a>
+          <a class="secondary-button mini" href="/download/${safeId}">Download</a>
+          <button class="secondary-button mini" data-form-action="edit" data-id="${safeId}" type="button">Edit</button>
+          <button class="secondary-button mini" data-form-action="toggle" data-id="${safeId}" type="button">${active ? "Disable" : "Enable"}</button>
+          <button class="danger-button mini" data-form-action="delete" data-id="${safeId}" type="button">Delete</button>
+        </td>
+      </tr>`;
+    }).join("");
+  }
+
+  async function loadDepartmentOptions(selectedId = "") {
+    const select = $("formDepartment");
+    if (!select) return;
+    try {
+      const result = await api("/api/admin/departments");
+      const departments = result.data.departments || [];
+      select.innerHTML = departments.map((d) => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.icon || "📁")} ${escapeHtml(d.name)}${Number(d.is_active) === 1 ? "" : " (Inactive)"}</option>`).join("");
+      if (selectedId) select.value = String(selectedId);
+    } catch (error) {
+      select.innerHTML = "<option value=\"\">Unable to load departments</option>";
+    }
+  }
+
+  async function getAdminForm(id) {
+    const result = await api(`/api/admin/forms/${id}`);
+    return result.data.form;
+  }
+
+  function openFormModal(form = null) {
+    $("formId").value = form?.id || "";
+    $("formName").value = form?.name || "";
+    $("formDescription").value = form?.description || "";
+    $("formSort").value = Number(form?.sort_order || 1);
+    $("formActive").checked = form ? Number(form.is_active) === 1 : true;
+    $("formPdfFile").value = "";
+    $("formModalTitle").textContent = form ? "Edit PDF Form" : "Add PDF Form";
+    $("formFileHint").textContent = form ? "(leave empty to keep current PDF)" : "(required for new forms)";
+    $("currentFormFile").textContent = form?.original_filename ? `Current PDF: ${form.original_filename}` : "";
+    showMessage($("formFormMessage"), "");
+    loadDepartmentOptions(form?.department_id || "");
+    $("formModal").classList.remove("hidden");
+    $("formModal").setAttribute("aria-hidden", "false");
+    setTimeout(() => $("formName").focus(), 0);
+  }
+
+  function closeFormModal() {
+    $("formModal")?.classList.add("hidden");
+    $("formModal")?.setAttribute("aria-hidden", "true");
+  }
+
+  $("addFormButton")?.addEventListener("click", () => openFormModal());
+  $("closeFormModal")?.addEventListener("click", closeFormModal);
+  $("cancelFormButton")?.addEventListener("click", closeFormModal);
+  $("formModal")?.addEventListener("click", (event) => {
+    if (event.target.dataset.closeFormModal) closeFormModal();
+  });
+
+  let formSearchTimer;
+  $("formSearch")?.addEventListener("input", (event) => {
+    clearTimeout(formSearchTimer);
+    formSearchTimer = setTimeout(() => loadForms(event.target.value.trim()), 250);
+  });
+
+  $("formsBody")?.addEventListener("click", async (event) => {
+    const button = event.target.closest("button[data-form-action]");
+    if (!button) return;
+    const id = Number(button.dataset.id);
+    const action = button.dataset.formAction;
+    if (!id) return;
+
+    try {
+      const form = await getAdminForm(id);
+      if (action === "edit") openFormModal(form);
+      if (action === "toggle") {
+        const data = new FormData();
+        data.append("department_id", String(form.department_id));
+        data.append("name", form.name);
+        data.append("description", form.description || "");
+        data.append("sort_order", String(form.sort_order || 0));
+        data.append("is_active", Number(form.is_active) === 1 ? "0" : "1");
+        await submitFormData(`/api/admin/forms/${id}`, "PUT", data);
+        showMessage($("formMessage"), "PDF form status updated.", "success");
+        await refreshAll();
+      }
+      if (action === "delete") {
+        if (!window.confirm(`Delete “${form.name}”? This removes the database record and the stored PDF.`)) return;
+        await api(`/api/admin/forms/${id}`, { method: "DELETE" });
+        showMessage($("formMessage"), "PDF form deleted.", "success");
+        await refreshAll();
+      }
+    } catch (error) {
+      showMessage($("formMessage"), error.message || "Action failed.");
+    }
+  });
+
+  async function submitFormData(url, method, formData) {
+    const response = await fetch(url, {
+      method,
+      body: formData,
+      credentials: "same-origin",
+      cache: "no-store"
+    });
+    let data = null;
+    try { data = await response.json(); } catch {}
+    if (!response.ok) {
+      const error = new Error(data?.error || "Request failed.");
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+    return data;
+  }
+
+  $("formForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const save = $("saveFormButton");
+    const id = $("formId").value.trim();
+    const data = new FormData();
+    data.append("department_id", $("formDepartment").value);
+    data.append("name", $("formName").value.trim());
+    data.append("description", $("formDescription").value.trim());
+    data.append("sort_order", String(Number($("formSort").value || 0)));
+    data.append("is_active", $("formActive").checked ? "1" : "0");
+    const file = $("formPdfFile").files[0];
+    if (file) data.append("pdf_file", file, file.name);
+
+    save.disabled = true;
+    showMessage($("formFormMessage"), "Saving…", "success");
+    try {
+      await submitFormData(id ? `/api/admin/forms/${id}` : "/api/admin/forms", id ? "PUT" : "POST", data);
+      closeFormModal();
+      showMessage($("formMessage"), id ? "PDF form updated successfully." : "PDF form uploaded successfully.", "success");
+      await refreshAll();
+    } catch (error) {
+      showMessage($("formFormMessage"), error.message || "Unable to save PDF form.");
+    } finally {
+      save.disabled = false;
+    }
+  });
 
   $("logoutButton")?.addEventListener("click", async () => {
     const button = $("logoutButton");
