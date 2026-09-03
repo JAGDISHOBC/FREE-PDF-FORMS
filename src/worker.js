@@ -162,6 +162,28 @@ export default {
         return await handleAdminDashboard(request, env, commonHeaders);
       }
 
+      if (path === "/api/admin/departments" && request.method === "GET") {
+        return await handleAdminDepartmentsList(request, env, commonHeaders);
+      }
+
+      if (path === "/api/admin/departments" && request.method === "POST") {
+        return await handleAdminDepartmentCreate(request, env, commonHeaders);
+      }
+
+      const adminDepartmentMatch = path.match(/^\/api\/admin\/departments\/([0-9]+)$/);
+
+      if (adminDepartmentMatch) {
+        const departmentId = Number(adminDepartmentMatch[1]);
+
+        if (request.method === "PUT") {
+          return await handleAdminDepartmentUpdate(request, env, commonHeaders, departmentId);
+        }
+
+        if (request.method === "DELETE") {
+          return await handleAdminDepartmentDelete(request, env, commonHeaders, departmentId);
+        }
+      }
+
       // --------------------------------------------------
       // Admin panel routes
       // --------------------------------------------------
@@ -499,6 +521,287 @@ async function handleAdminDashboard(request, env, commonHeaders) {
   }
 }
 
+
+async function handleAdminDepartmentsList(request, env, commonHeaders) {
+  const session = await getAdminSession(request, env);
+
+  if (!session) {
+    return jsonResponse({
+      success: false,
+      code: "UNAUTHORIZED",
+      error: "Admin login required."
+    }, 401, commonHeaders);
+  }
+
+  try {
+    const result = await env.DB.prepare(`
+      SELECT
+        d.id,
+        d.name,
+        d.description,
+        d.icon,
+        d.sort_order,
+        d.is_active,
+        d.created_at,
+        d.updated_at,
+        (SELECT COUNT(*) FROM forms f WHERE f.department_id = d.id) AS form_count
+      FROM departments d
+      ORDER BY d.sort_order ASC, d.id ASC
+    `).all();
+
+    return jsonResponse({
+      success: true,
+      data: {
+        departments: result.results || []
+      }
+    }, 200, {
+      ...commonHeaders,
+      "Cache-Control": "no-store"
+    });
+  } catch (error) {
+    console.error("Admin departments list error:", error);
+    return jsonResponse({
+      success: false,
+      error: "Unable to load departments."
+    }, 500, commonHeaders);
+  }
+}
+
+
+async function readDepartmentPayload(request) {
+  const contentType = request.headers.get("Content-Type") || "";
+  if (!contentType.includes("application/json")) {
+    return { error: "JSON request body is required." };
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return { error: "Invalid JSON request." };
+  }
+
+  const name = String(body?.name ?? "").trim();
+  const description = String(body?.description ?? "").trim();
+  const icon = String(body?.icon ?? "").trim();
+
+  const rawSort = body?.sort_order;
+  const sort_order = Number.isFinite(Number(rawSort)) ? Math.trunc(Number(rawSort)) : 0;
+
+  const rawActive = body?.is_active;
+  const is_active = rawActive === false || rawActive === 0 || rawActive === "0" ? 0 : 1;
+
+  if (!name) {
+    return { error: "Department name is required." };
+  }
+  if (name.length > 150) {
+    return { error: "Department name must be 150 characters or fewer." };
+  }
+  if (description.length > 500) {
+    return { error: "Description must be 500 characters or fewer." };
+  }
+  if (icon.length > 20) {
+    return { error: "Icon must be 20 characters or fewer." };
+  }
+  if (sort_order < 0 || sort_order > 999999) {
+    return { error: "Sort order must be between 0 and 999999." };
+  }
+
+  return { data: { name, description, icon, sort_order, is_active } };
+}
+
+
+async function handleAdminDepartmentCreate(request, env, commonHeaders) {
+  const session = await getAdminSession(request, env);
+  if (!session) {
+    return jsonResponse({
+      success: false,
+      code: "UNAUTHORIZED",
+      error: "Admin login required."
+    }, 401, commonHeaders);
+  }
+
+  try {
+    const payload = await readDepartmentPayload(request);
+    if (payload.error) {
+      return jsonResponse({ success: false, error: payload.error }, 400, commonHeaders);
+    }
+
+    const duplicate = await env.DB.prepare(`
+      SELECT id FROM departments WHERE lower(name) = lower(?) LIMIT 1
+    `).bind(payload.data.name).first();
+
+    if (duplicate) {
+      return jsonResponse({
+        success: false,
+        code: "DUPLICATE_NAME",
+        error: "A department with this name already exists."
+      }, 409, commonHeaders);
+    }
+
+    const result = await env.DB.prepare(`
+      INSERT INTO departments (name, description, icon, sort_order, is_active)
+      VALUES (?, ?, ?, ?, ?)
+      RETURNING id, name, description, icon, sort_order, is_active, created_at, updated_at
+    `).bind(
+      payload.data.name,
+      payload.data.description,
+      payload.data.icon,
+      payload.data.sort_order,
+      payload.data.is_active
+    ).first();
+
+    return jsonResponse({
+      success: true,
+      message: "Department created successfully.",
+      data: { department: result }
+    }, 201, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin department create error:", error);
+    return jsonResponse({
+      success: false,
+      error: "Unable to create department."
+    }, 500, commonHeaders);
+  }
+}
+
+
+async function handleAdminDepartmentUpdate(request, env, commonHeaders, departmentId) {
+  const session = await getAdminSession(request, env);
+  if (!session) {
+    return jsonResponse({
+      success: false,
+      code: "UNAUTHORIZED",
+      error: "Admin login required."
+    }, 401, commonHeaders);
+  }
+
+  if (!Number.isInteger(departmentId) || departmentId < 1) {
+    return jsonResponse({ success: false, error: "Invalid department ID." }, 400, commonHeaders);
+  }
+
+  try {
+    const payload = await readDepartmentPayload(request);
+    if (payload.error) {
+      return jsonResponse({ success: false, error: payload.error }, 400, commonHeaders);
+    }
+
+    const existing = await env.DB.prepare(`
+      SELECT id FROM departments WHERE id = ? LIMIT 1
+    `).bind(departmentId).first();
+
+    if (!existing) {
+      return jsonResponse({
+        success: false,
+        code: "NOT_FOUND",
+        error: "Department not found."
+      }, 404, commonHeaders);
+    }
+
+    const duplicate = await env.DB.prepare(`
+      SELECT id FROM departments
+      WHERE lower(name) = lower(?) AND id != ?
+      LIMIT 1
+    `).bind(payload.data.name, departmentId).first();
+
+    if (duplicate) {
+      return jsonResponse({
+        success: false,
+        code: "DUPLICATE_NAME",
+        error: "A department with this name already exists."
+      }, 409, commonHeaders);
+    }
+
+    const result = await env.DB.prepare(`
+      UPDATE departments
+      SET name = ?,
+          description = ?,
+          icon = ?,
+          sort_order = ?,
+          is_active = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+      RETURNING id, name, description, icon, sort_order, is_active, created_at, updated_at
+    `).bind(
+      payload.data.name,
+      payload.data.description,
+      payload.data.icon,
+      payload.data.sort_order,
+      payload.data.is_active,
+      departmentId
+    ).first();
+
+    return jsonResponse({
+      success: true,
+      message: "Department updated successfully.",
+      data: { department: result }
+    }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin department update error:", error);
+    return jsonResponse({
+      success: false,
+      error: "Unable to update department."
+    }, 500, commonHeaders);
+  }
+}
+
+
+async function handleAdminDepartmentDelete(request, env, commonHeaders, departmentId) {
+  const session = await getAdminSession(request, env);
+  if (!session) {
+    return jsonResponse({
+      success: false,
+      code: "UNAUTHORIZED",
+      error: "Admin login required."
+    }, 401, commonHeaders);
+  }
+
+  if (!Number.isInteger(departmentId) || departmentId < 1) {
+    return jsonResponse({ success: false, error: "Invalid department ID." }, 400, commonHeaders);
+  }
+
+  try {
+    const department = await env.DB.prepare(`
+      SELECT id, name FROM departments WHERE id = ? LIMIT 1
+    `).bind(departmentId).first();
+
+    if (!department) {
+      return jsonResponse({
+        success: false,
+        code: "NOT_FOUND",
+        error: "Department not found."
+      }, 404, commonHeaders);
+    }
+
+    const formCount = await env.DB.prepare(`
+      SELECT COUNT(*) AS count FROM forms WHERE department_id = ?
+    `).bind(departmentId).first();
+
+    const count = Number(formCount?.count || 0);
+    if (count > 0) {
+      return jsonResponse({
+        success: false,
+        code: "HAS_FORMS",
+        error: `This department contains ${count} PDF form${count === 1 ? "" : "s"}. Move or delete those forms before deleting the department.`
+      }, 409, commonHeaders);
+    }
+
+    await env.DB.prepare(`
+      DELETE FROM departments WHERE id = ?
+    `).bind(departmentId).run();
+
+    return jsonResponse({
+      success: true,
+      message: "Department deleted successfully."
+    }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin department delete error:", error);
+    return jsonResponse({
+      success: false,
+      error: "Unable to delete department."
+    }, 500, commonHeaders);
+  }
+}
 
 async function serveAdminPage(request, env, authenticated) {
   const target = authenticated ? "/__admin/dashboard.html" : "/__admin/login.html";

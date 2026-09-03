@@ -23,40 +23,92 @@
       <div>
         <p class="eyebrow">CONTROL CENTER</p>
         <h2>Welcome, <span id="adminUsername">Admin</span> 👋</h2>
-        <p class="muted">This is Phase 3A. Content management and analytics will be added in the next phases.</p>
+        <p class="muted">Manage your public content safely from one place. Phase 3B adds live Departments management.</p>
       </div>
       <div class="status-pill">● Secure session active</div>
     </section>
 
     <section class="stats-grid" aria-label="Website totals">
-      <article class="stat-card">
-        <span>Departments</span>
-        <strong id="departmentCount">—</strong>
-      </article>
-      <article class="stat-card">
-        <span>PDF Forms</span>
-        <strong id="formCount">—</strong>
-      </article>
-      <article class="stat-card">
-        <span>Government Links</span>
-        <strong id="linkCount">—</strong>
-      </article>
+      <article class="stat-card"><span>Departments</span><strong id="departmentCount">—</strong></article>
+      <article class="stat-card"><span>PDF Forms</span><strong id="formCount">—</strong></article>
+      <article class="stat-card"><span>Government Links</span><strong id="linkCount">—</strong></article>
     </section>
 
-    <section class="roadmap-card">
-      <p class="eyebrow">NEXT MODULES</p>
-      <h2>Admin control center</h2>
-      <div class="module-grid">
-        <div class="module"><b>🧰 Tools Manager</b><span>Current and future online tools</span></div>
-        <div class="module"><b>📑 PDF Forms</b><span>Upload, edit, activate and delete</span></div>
-        <div class="module"><b>🏢 Departments</b><span>Manage categories and ordering</span></div>
-        <div class="module"><b>🔗 Government Links</b><span>Manage useful external links</span></div>
-        <div class="module"><b>⚙️ Website Settings</b><span>Title, subtitle and footer</span></div>
-        <div class="module"><b>📊 Analytics</b><span>Privacy-aware visitor and tool analytics</span></div>
+    <section class="manager-card" id="departmentsManager">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">CONTENT MANAGEMENT</p>
+          <h2>Departments</h2>
+          <p class="muted">Add, edit, activate/deactivate, reorder and safely delete departments.</p>
+        </div>
+        <button id="addDepartmentButton" class="primary-button" type="button">＋ Add Department</button>
+      </div>
+
+      <div id="departmentMessage" class="message" role="status" aria-live="polite"></div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Department</th>
+              <th>Description</th>
+              <th>Status</th>
+              <th>Forms</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="departmentsBody">
+            <tr><td colspan="6" class="table-empty">Loading departments…</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
-    <div id="dashboardMessage" class="message" role="status" aria-live="polite"></div>
+    <div id="departmentModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="1"></div>
+      <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="departmentModalTitle">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">DEPARTMENT</p>
+            <h2 id="departmentModalTitle">Add Department</h2>
+          </div>
+          <button id="closeDepartmentModal" class="icon-button" type="button" aria-label="Close">×</button>
+        </div>
+
+        <form id="departmentForm">
+          <input type="hidden" id="departmentId">
+
+          <label for="departmentName">Department name</label>
+          <input id="departmentName" name="name" maxlength="150" required placeholder="e.g. Health Department Forms">
+
+          <label for="departmentDescription">Description</label>
+          <textarea id="departmentDescription" name="description" maxlength="500" rows="3" placeholder="Short description shown on the website"></textarea>
+
+          <div class="form-grid">
+            <div>
+              <label for="departmentIcon">Icon</label>
+              <input id="departmentIcon" name="icon" maxlength="20" placeholder="🏢">
+            </div>
+            <div>
+              <label for="departmentSort">Sort order</label>
+              <input id="departmentSort" name="sort_order" type="number" min="0" max="999999" value="1">
+            </div>
+          </div>
+
+          <label class="checkbox-row">
+            <input id="departmentActive" name="is_active" type="checkbox" checked>
+            <span>Show this department publicly</span>
+          </label>
+
+          <div id="departmentFormMessage" class="message" role="alert"></div>
+          <div class="modal-actions">
+            <button id="cancelDepartmentButton" class="secondary-button" type="button">Cancel</button>
+            <button id="saveDepartmentButton" class="primary-button" type="submit">Save Department</button>
+          </div>
+        </form>
+      </section>
+    </div>
   </main>
   <script src="/admin/admin.js"></script>
 </body>
