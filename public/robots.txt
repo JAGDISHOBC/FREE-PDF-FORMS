@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://free-pdf-forms.jagdishobc.workers.dev/sitemap.xml
