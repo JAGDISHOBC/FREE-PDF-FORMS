@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Dashboard • Free PDF Forms</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body class="admin-body dashboard-body">
+  <header class="admin-topbar">
+    <div>
+      <div class="eyebrow">FREE PDF FORMS</div>
+      <h1>Admin Dashboard</h1>
+    </div>
+    <div class="top-actions">
+      <a href="/" target="_blank" rel="noopener">View website</a>
+      <button id="logoutButton" class="secondary-button" type="button">Logout</button>
+    </div>
+  </header>
+
+  <main class="dashboard-shell">
+    <section class="welcome-card">
+      <div>
+        <p class="eyebrow">CONTROL CENTER</p>
+        <h2>Welcome, <span id="adminUsername">Admin</span> 👋</h2>
+        <p class="muted">This is Phase 3A. Content management and analytics will be added in the next phases.</p>
+      </div>
+      <div class="status-pill">● Secure session active</div>
+    </section>
+
+    <section class="stats-grid" aria-label="Website totals">
+      <article class="stat-card">
+        <span>Departments</span>
+        <strong id="departmentCount">—</strong>
+      </article>
+      <article class="stat-card">
+        <span>PDF Forms</span>
+        <strong id="formCount">—</strong>
+      </article>
+      <article class="stat-card">
+        <span>Government Links</span>
+        <strong id="linkCount">—</strong>
+      </article>
+    </section>
+
+    <section class="roadmap-card">
+      <p class="eyebrow">NEXT MODULES</p>
+      <h2>Admin control center</h2>
+      <div class="module-grid">
+        <div class="module"><b>🧰 Tools Manager</b><span>Current and future online tools</span></div>
+        <div class="module"><b>📑 PDF Forms</b><span>Upload, edit, activate and delete</span></div>
+        <div class="module"><b>🏢 Departments</b><span>Manage categories and ordering</span></div>
+        <div class="module"><b>🔗 Government Links</b><span>Manage useful external links</span></div>
+        <div class="module"><b>⚙️ Website Settings</b><span>Title, subtitle and footer</span></div>
+        <div class="module"><b>📊 Analytics</b><span>Privacy-aware visitor and tool analytics</span></div>
+      </div>
+    </section>
+
+    <div id="dashboardMessage" class="message" role="status" aria-live="polite"></div>
+  </main>
+  <script src="/admin/admin.js"></script>
+</body>
+</html>

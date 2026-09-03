@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Login • Free PDF Forms</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body class="admin-body">
+  <main class="auth-shell">
+    <section class="auth-card">
+      <div class="brand-mark">📄</div>
+      <p class="eyebrow">ADMIN PANEL</p>
+      <h1>Sign in</h1>
+      <p class="muted">Manage your website from one secure dashboard.</p>
+
+      <form id="loginForm" method="post" action="/api/admin/login">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" autocomplete="username" value="admin" required>
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+        <button id="loginButton" type="submit">Sign in</button>
+        <div id="loginMessage" class="message" role="alert" aria-live="polite"></div>
+
+      <noscript>Please enable JavaScript for login status messages.</noscript>
+      </form>
+
+      <a class="back-link" href="/">← Back to website</a>
+    </section>
+  </main>
+  <script src="/admin/admin.js"></script>
+</body>
+</html>

@@ -10,7 +10,12 @@
     "run_worker_first": [
       "/api/*",
       "/pdf/*",
-      "/download/*"
+      "/download/*",
+      "/admin",
+      "/admin/",
+      "/admin/login",
+      "/admin/login/",
+      "/__admin/dashboard.html"
     ]
   },
   "ai": {

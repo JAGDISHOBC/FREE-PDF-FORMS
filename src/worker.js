@@ -143,6 +143,49 @@ export default {
       }
 
       // --------------------------------------------------
+      // Admin authentication API
+      // --------------------------------------------------
+
+      if (path === "/api/admin/login" && request.method === "POST") {
+        return await handleAdminLogin(request, env, commonHeaders);
+      }
+
+      if (path === "/api/admin/logout" && request.method === "POST") {
+        return await handleAdminLogout(request, env, commonHeaders);
+      }
+
+      if (path === "/api/admin/me" && request.method === "GET") {
+        return await handleAdminMe(request, env, commonHeaders);
+      }
+
+      if (path === "/api/admin/dashboard" && request.method === "GET") {
+        return await handleAdminDashboard(request, env, commonHeaders);
+      }
+
+      // --------------------------------------------------
+      // Admin panel routes
+      // --------------------------------------------------
+
+      if (path === "/admin" || path === "/admin/") {
+        return await serveAdminPage(request, env, Boolean(await getAdminSession(request, env)));
+      }
+
+      // Keep both common login URLs working without redirects.
+      if (path === "/admin/login" || path === "/admin/login/") {
+        return await serveAdminPage(request, env, false);
+      }
+
+      // Protect the dashboard asset itself so an unauthenticated user
+      // cannot bypass the /admin gate by opening the asset URL directly.
+      if (path === "/__admin/dashboard.html") {
+        const session = await getAdminSession(request, env);
+        if (!session) {
+          return await serveAdminPage(request, env, false);
+        }
+        return await serveAdminAsset(request, env, "/__admin/dashboard.html");
+      }
+
+      // --------------------------------------------------
       // API 404
       // --------------------------------------------------
 
@@ -185,6 +228,406 @@ export default {
     }
   }
 };
+
+
+
+// ======================================================
+// ADMIN AUTHENTICATION
+// ======================================================
+
+const ADMIN_SESSION_COOKIE = "admin_session";
+const ADMIN_SESSION_HOURS = 8;
+
+async function handleAdminLogin(request, env, commonHeaders) {
+  try {
+    if (!env.ADMIN_PASSWORD) {
+      return jsonResponse({
+        success: false,
+        code: "ADMIN_NOT_CONFIGURED",
+        error: "Admin login is not configured."
+      }, 503, commonHeaders);
+    }
+
+    let username = "";
+    let password = "";
+
+    const contentType = request.headers.get("Content-Type") || "";
+
+    if (contentType.includes("application/json")) {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({
+          success: false,
+          code: "INVALID_REQUEST",
+          error: "Invalid login request."
+        }, 400, commonHeaders);
+      }
+
+      username = String(body?.username || "").trim();
+      password = String(body?.password || "");
+    } else if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+      const form = await request.formData();
+      username = String(form.get("username") || "").trim();
+      password = String(form.get("password") || "");
+    } else {
+      return jsonResponse({
+        success: false,
+        code: "INVALID_REQUEST",
+        error: "Invalid login request."
+      }, 400, commonHeaders);
+    }
+
+    if (!username || !password) {
+      return jsonResponse({
+        success: false,
+        code: "MISSING_CREDENTIALS",
+        error: "Username and password are required."
+      }, 400, commonHeaders);
+    }
+
+    if (username !== "admin") {
+      return jsonResponse({
+        success: false,
+        code: "INVALID_CREDENTIALS",
+        error: "Invalid username or password."
+      }, 401, commonHeaders);
+    }
+
+    const passwordMatches = await secureSecretCompare(
+      password,
+      env.ADMIN_PASSWORD
+    );
+
+    if (!passwordMatches) {
+      return jsonResponse({
+        success: false,
+        code: "INVALID_CREDENTIALS",
+        error: "Invalid username or password."
+      }, 401, commonHeaders);
+    }
+
+    const passwordHash = await sha256Hex(password);
+
+    const existingUser = await env.DB.prepare(`
+      SELECT id
+      FROM admin_users
+      WHERE username = ?
+      LIMIT 1
+    `).bind(username).first();
+
+    let userId;
+
+    if (existingUser) {
+      userId = Number(existingUser.id);
+
+      await env.DB.prepare(`
+        UPDATE admin_users
+        SET password_hash = ?, is_active = 1, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(passwordHash, userId).run();
+    } else {
+      const created = await env.DB.prepare(`
+        INSERT INTO admin_users (username, password_hash, is_active)
+        VALUES (?, ?, 1)
+        RETURNING id
+      `).bind(username, passwordHash).first();
+
+      userId = Number(created?.id || 0);
+    }
+
+    if (!userId) {
+      throw new Error("Unable to create admin user.");
+    }
+
+    await env.DB.prepare(`
+      DELETE FROM admin_sessions
+      WHERE user_id = ? OR expires_at <= ?
+    `).bind(userId, new Date().toISOString()).run();
+
+    const token = createRandomToken();
+    const tokenHash = await sha256Hex(token);
+    const expiresAt = new Date(
+      Date.now() + ADMIN_SESSION_HOURS * 60 * 60 * 1000
+    ).toISOString();
+
+    await env.DB.prepare(`
+      INSERT INTO admin_sessions
+        (user_id, token_hash, expires_at)
+      VALUES (?, ?, ?)
+    `).bind(userId, tokenHash, expiresAt).run();
+
+    const headers = new Headers(commonHeaders);
+    headers.append(
+      "Set-Cookie",
+      buildAdminCookie(token, ADMIN_SESSION_HOURS * 60 * 60)
+    );
+    headers.set("Cache-Control", "no-store");
+
+    // Normal HTML form submissions are redirected by the server itself.
+    // This makes the authenticated navigation deterministic and avoids
+    // relying on a JavaScript fetch followed by a separate navigation.
+    if (!contentType.includes("application/json")) {
+      headers.set("Location", "/admin");
+      return new Response(null, { status: 303, headers });
+    }
+
+    return jsonResponse({
+      success: true,
+      message: "Login successful.",
+      data: {
+        username,
+        expiresAt
+      }
+    }, 200, headers);
+
+  } catch (error) {
+    console.error("Admin login error:", error);
+
+    return jsonResponse({
+      success: false,
+      error: "Unable to complete admin login."
+    }, 500, commonHeaders);
+  }
+}
+
+
+async function handleAdminLogout(request, env, commonHeaders) {
+  try {
+    const token = getAdminCookie(request);
+
+    if (token) {
+      const tokenHash = await sha256Hex(token);
+
+      await env.DB.prepare(`
+        DELETE FROM admin_sessions
+        WHERE token_hash = ?
+      `).bind(tokenHash).run();
+    }
+
+    const headers = new Headers(commonHeaders);
+    headers.append("Set-Cookie", clearAdminCookie());
+    headers.set("Cache-Control", "no-store");
+
+    return jsonResponse({
+      success: true,
+      message: "Logged out successfully."
+    }, 200, headers);
+
+  } catch (error) {
+    console.error("Admin logout error:", error);
+
+    const headers = new Headers(commonHeaders);
+    headers.append("Set-Cookie", clearAdminCookie());
+
+    return jsonResponse({
+      success: false,
+      error: "Unable to complete logout."
+    }, 500, headers);
+  }
+}
+
+
+async function handleAdminMe(request, env, commonHeaders) {
+  const session = await getAdminSession(request, env);
+
+  if (!session) {
+    return jsonResponse({
+      success: false,
+      code: "UNAUTHORIZED",
+      error: "Admin login required."
+    }, 401, commonHeaders);
+  }
+
+  return jsonResponse({
+    success: true,
+    data: {
+      username: session.username,
+      expiresAt: session.expires_at
+    }
+  }, 200, {
+    ...commonHeaders,
+    "Cache-Control": "no-store"
+  });
+}
+
+
+async function handleAdminDashboard(request, env, commonHeaders) {
+  const session = await getAdminSession(request, env);
+
+  if (!session) {
+    return jsonResponse({
+      success: false,
+      code: "UNAUTHORIZED",
+      error: "Admin login required."
+    }, 401, commonHeaders);
+  }
+
+  try {
+    const [departments, forms, links] = await Promise.all([
+      env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM departments"
+      ).first(),
+      env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM forms"
+      ).first(),
+      env.DB.prepare(
+        "SELECT COUNT(*) AS count FROM government_links"
+      ).first()
+    ]);
+
+    return jsonResponse({
+      success: true,
+      data: {
+        departments: Number(departments?.count || 0),
+        forms: Number(forms?.count || 0),
+        governmentLinks: Number(links?.count || 0)
+      }
+    }, 200, {
+      ...commonHeaders,
+      "Cache-Control": "no-store"
+    });
+
+  } catch (error) {
+    console.error("Admin dashboard error:", error);
+
+    return jsonResponse({
+      success: false,
+      error: "Unable to load dashboard."
+    }, 500, commonHeaders);
+  }
+}
+
+
+async function serveAdminPage(request, env, authenticated) {
+  const target = authenticated ? "/__admin/dashboard.html" : "/__admin/login.html";
+  return await serveAdminAsset(request, env, target);
+}
+
+async function serveAdminAsset(request, env, target) {
+  const response = await env.ASSETS.fetch(
+    new Request(new URL(target, request.url), { method: "GET", headers: request.headers })
+  );
+
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", "no-store, max-age=0, must-revalidate");
+  headers.set("Pragma", "no-cache");
+  headers.set("Expires", "0");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
+
+async function getAdminSession(request, env) {
+  if (!env.DB) return null;
+
+  const token = getAdminCookie(request);
+  if (!token) return null;
+
+  const tokenHash = await sha256Hex(token);
+
+  const session = await env.DB.prepare(`
+    SELECT
+      s.id,
+      s.user_id,
+      s.expires_at,
+      u.username
+    FROM admin_sessions s
+    INNER JOIN admin_users u
+      ON u.id = s.user_id
+    WHERE s.token_hash = ?
+      AND s.expires_at > ?
+      AND u.is_active = 1
+    LIMIT 1
+  `).bind(tokenHash, new Date().toISOString()).first();
+
+  return session || null;
+}
+
+
+function getAdminCookie(request) {
+  const cookieHeader = request.headers.get("Cookie") || "";
+
+  for (const part of cookieHeader.split(";")) {
+    const [rawName, ...rawValue] = part.trim().split("=");
+
+    if (rawName === ADMIN_SESSION_COOKIE) {
+      return rawValue.join("=") || "";
+    }
+  }
+
+  return "";
+}
+
+
+function buildAdminCookie(token, maxAgeSeconds) {
+  return [
+    `${ADMIN_SESSION_COOKIE}=${token}`,
+    "Path=/",
+    `Max-Age=${maxAgeSeconds}`,
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax"
+  ].join("; ");
+}
+
+
+function clearAdminCookie() {
+  return [
+    `${ADMIN_SESSION_COOKIE}=`,
+    "Path=/",
+    "Max-Age=0",
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax"
+  ].join("; ");
+}
+
+
+function createRandomToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+
+async function secureSecretCompare(input, secret) {
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(String(input))
+    ),
+    crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(String(secret))
+    )
+  ]);
+
+  const aa = new Uint8Array(a);
+  const bb = new Uint8Array(b);
+
+  let difference = aa.length ^ bb.length;
+
+  for (let i = 0; i < Math.max(aa.length, bb.length); i++) {
+    difference |= (aa[i] || 0) ^ (bb[i] || 0);
+  }
+
+  return difference === 0;
+}
 
 
 // ======================================================

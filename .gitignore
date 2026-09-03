@@ -14,3 +14,5 @@ wrangler-backup*.jsonc
 *-TEST.txt
 *.tmp
 
+
+wrangler-admin-backup.jsonc
