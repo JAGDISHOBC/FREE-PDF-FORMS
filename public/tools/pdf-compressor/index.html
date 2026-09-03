@@ -1,25 +1,9 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PDF Compressor - Free PDF Forms & Government Resources</title>
-
-<meta name="description" content="Compress PDF files online for free. Reduce PDF size with Normal, Basic and Strong compression while keeping documents readable and searchable.">
-
-<meta name="robots" content="index,follow">
-
-<link rel="canonical" href="https://free-pdf-forms.jagdishobc.workers.dev/tools/pdf-compressor">
-
-<meta property="og:type" content="website">
-<meta property="og:title" content="Compress PDF Online | Free PDF Compressor">
-<meta property="og:description" content="Reduce PDF file size with free Normal, Basic and Strong compression while keeping your document readable and searchable.">
-<meta property="og:url" content="https://free-pdf-forms.jagdishobc.workers.dev/tools/pdf-compressor">
-
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Compress PDF Online | Free PDF Compressor">
-<meta name="twitter:description" content="Reduce PDF file size online with free PDF compression.">
-
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#687386;--line:#e4e8ef;--primary:#2563eb;--success:#15803d;--danger:#dc2626}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--text)}
@@ -36,11 +20,11 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="hero"><h1>ðŸ“„ Compress PDF</h1><p>Reduce PDF size while keeping your document usable, searchable and readable.</p></div>
+  <div class="hero"><h1>📄 Compress PDF</h1><p>Reduce PDF size while keeping your document usable, searchable and readable.</p></div>
   <div class="card">
     <div id="drop" class="drop" tabindex="0">
       <input id="fileInput" type="file" accept="application/pdf,.pdf">
-      <div style="font-size:38px">ðŸ“„</div>
+      <div style="font-size:38px">📄</div>
       <h2 style="margin:10px 0 6px">Choose a PDF</h2>
       <p style="margin:0 0 16px;color:#687386">Your PDF stays in your browser during compression.</p>
       <button id="choose" class="choose" type="button">Choose PDF</button>
@@ -54,8 +38,8 @@
     <div id="controls" class="hidden">
       <h3 style="margin:20px 0 4px">Compression level</h3>
       <div class="levels">
-        <label class="level"><input type="radio" name="level" value="normal"><strong>Normal</strong><span>Quality priority Â· light optimization</span></label>
-        <label class="level selected"><input type="radio" name="level" value="basic" checked><strong>Basic â­</strong><span>Balanced size and quality</span></label>
+        <label class="level"><input type="radio" name="level" value="normal"><strong>Normal</strong><span>Quality priority · light optimization</span></label>
+        <label class="level selected"><input type="radio" name="level" value="basic" checked><strong>Basic ⭐</strong><span>Balanced size and quality</span></label>
         <label class="level"><input type="radio" name="level" value="strong"><strong>Strong</strong><span>Maximum practical reduction</span></label>
       </div>
       <div class="actions">
@@ -70,34 +54,34 @@
   </div>
 
   <div id="result" class="card result">
-    <h2 style="margin-top:0">âœ“ Compression Result</h2>
+    <h2 style="margin-top:0">✓ Compression Result</h2>
     <div id="resultMessage" class="status show"></div>
     <div class="stats">
-      <div class="stat"><small>Original</small><b id="originalSize">â€”</b></div>
-      <div class="stat"><small>Compressed</small><b id="compressedSize">â€”</b></div>
-      <div class="stat"><small>Saved</small><b id="savedSize">â€”</b></div>
+      <div class="stat"><small>Original</small><b id="originalSize">—</b></div>
+      <div class="stat"><small>Compressed</small><b id="compressedSize">—</b></div>
+      <div class="stat"><small>Saved</small><b id="savedSize">—</b></div>
     </div>
     <div class="checks">
-      <div id="checkOpen" class="check">â³ PDF validation pending</div>
-      <div id="checkPages" class="check">â³ Page count pending</div>
-      <div id="checkText" class="check">â³ Text extraction pending</div>
-      <div id="checkSearch" class="check">â³ Search/selectability test pending</div>
+      <div id="checkOpen" class="check">⏳ PDF validation pending</div>
+      <div id="checkPages" class="check">⏳ Page count pending</div>
+      <div id="checkText" class="check">⏳ Text extraction pending</div>
+      <div id="checkSearch" class="check">⏳ Search/selectability test pending</div>
     </div>
     <div class="filename">
       <label for="outName">File name</label>
       <input id="outName" type="text" value="compressed.pdf" autocomplete="off">
     </div>
     <div class="actions">
-      <button id="download" class="btn primary" disabled>â¬‡ Download Compressed PDF</button>
+      <button id="download" class="btn primary" disabled>⬇ Download Compressed PDF</button>
       <button id="testAgain" class="btn secondary">Try Another Level</button>
     </div>
     <div class="continue" style="margin-top:24px;padding-top:18px;border-top:1px solid var(--line)">
       <h3>Continue with this PDF</h3>
       <div class="tool-grid">
-        <button class="tool" type="button">â†» Rotate PDF</button>
-        <button class="tool" type="button">ðŸ—‘ Delete Pages</button>
-        <button class="tool" type="button">ðŸ” Protect PDF</button>
-        <button class="tool" type="button">âœ‚ Split PDF</button>
+        <button class="tool" type="button">↻ Rotate PDF</button>
+        <button class="tool" type="button">🗑 Delete Pages</button>
+        <button class="tool" type="button">🔐 Protect PDF</button>
+        <button class="tool" type="button">✂ Split PDF</button>
       </div>
     </div>
     <p class="note">Your PDF is processed directly in your browser. If a PDF is already highly optimized, further compression may produce little useful reduction without affecting quality.</p>
