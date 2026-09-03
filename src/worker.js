@@ -162,6 +162,14 @@ export default {
         return await handleAdminDashboard(request, env, commonHeaders);
       }
 
+      if (path === "/api/admin/settings" && request.method === "GET") {
+        return await handleAdminSettingsGet(request, env, commonHeaders);
+      }
+
+      if (path === "/api/admin/settings" && request.method === "PUT") {
+        return await handleAdminSettingsUpdate(request, env, commonHeaders);
+      }
+
       if (path === "/api/admin/departments" && request.method === "GET") {
         return await handleAdminDepartmentsList(request, env, commonHeaders);
       }
@@ -1040,6 +1048,114 @@ async function handleAdminLinkDelete(request, env, commonHeaders, linkId) {
   } catch (error) {
     console.error("Admin government link delete error:", error);
     return jsonResponse({ success: false, error: "Unable to delete government link." }, 500, commonHeaders);
+  }
+}
+
+async function handleAdminSettingsGet(request, env, commonHeaders) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+
+  try {
+    const settings = await env.DB.prepare(`
+      SELECT id, site_title, site_subtitle, footer_text, updated_at
+      FROM site_settings
+      WHERE id = 1
+      LIMIT 1
+    `).first();
+
+    return jsonResponse({
+      success: true,
+      data: {
+        settings: settings || {
+          id: 1,
+          site_title: "Free PDF Forms & Government Resources",
+          site_subtitle: "Government forms and useful resources in one place",
+          footer_text: "Free PDF Forms & Government Resources"
+        }
+      }
+    }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin settings get error:", error);
+    return jsonResponse({ success: false, error: "Unable to load website settings." }, 500, commonHeaders);
+  }
+}
+
+function readAdminSettingsPayload(body) {
+  const site_title = String(body?.site_title ?? "").trim();
+  const site_subtitle = String(body?.site_subtitle ?? "").trim();
+  const footer_text = String(body?.footer_text ?? "").trim();
+
+  if (!site_title) return { error: "Website title is required." };
+  if (site_title.length > 200) return { error: "Website title must be 200 characters or fewer." };
+  if (site_subtitle.length > 500) return { error: "Subtitle must be 500 characters or fewer." };
+  if (footer_text.length > 300) return { error: "Footer text must be 300 characters or fewer." };
+
+  return { data: { site_title, site_subtitle, footer_text } };
+}
+
+async function handleAdminSettingsUpdate(request, env, commonHeaders) {
+  const authError = await requireAdmin(request, env, commonHeaders);
+  if (authError) return authError;
+
+  const contentType = request.headers.get("Content-Type") || "";
+  if (!contentType.includes("application/json")) {
+    return jsonResponse({ success: false, error: "JSON request body is required." }, 400, commonHeaders);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ success: false, error: "Invalid JSON request." }, 400, commonHeaders);
+  }
+
+  const payload = readAdminSettingsPayload(body);
+  if (payload.error) {
+    return jsonResponse({ success: false, error: payload.error }, 400, commonHeaders);
+  }
+
+  try {
+    const result = await env.DB.prepare(`
+      UPDATE site_settings
+      SET site_title = ?, site_subtitle = ?, footer_text = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = 1
+      RETURNING id, site_title, site_subtitle, footer_text, updated_at
+    `).bind(
+      payload.data.site_title,
+      payload.data.site_subtitle,
+      payload.data.footer_text
+    ).first();
+
+    if (!result) {
+      await env.DB.prepare(`
+        INSERT INTO site_settings (id, site_title, site_subtitle, footer_text)
+        VALUES (1, ?, ?, ?)
+      `).bind(
+        payload.data.site_title,
+        payload.data.site_subtitle,
+        payload.data.footer_text
+      ).run();
+
+      const created = await env.DB.prepare(`
+        SELECT id, site_title, site_subtitle, footer_text, updated_at
+        FROM site_settings WHERE id = 1 LIMIT 1
+      `).first();
+
+      return jsonResponse({
+        success: true,
+        message: "Website settings updated successfully.",
+        data: { settings: created }
+      }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+    }
+
+    return jsonResponse({
+      success: true,
+      message: "Website settings updated successfully.",
+      data: { settings: result }
+    }, 200, { ...commonHeaders, "Cache-Control": "no-store" });
+  } catch (error) {
+    console.error("Admin settings update error:", error);
+    return jsonResponse({ success: false, error: "Unable to update website settings." }, 500, commonHeaders);
   }
 }
 

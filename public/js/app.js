@@ -385,7 +385,9 @@ function renderGovernmentLinks() {
 
 async function loadSettings() {
   try {
-    const response = await fetch("/api/settings");
+    const response = await fetch("/api/settings", {
+      cache: "no-store"
+    });
 
     if (!response.ok) {
       throw new Error("Settings request failed");
@@ -399,25 +401,44 @@ async function loadSettings() {
 
     const settings = result.data;
 
+    const siteTitle = settings.site_title || "";
+    const siteSubtitle = settings.site_subtitle || "";
+    const footerText = settings.footer_text || "";
+
     const footerTitle =
       document.getElementById("footerTitle");
 
     const footerSubtitle =
       document.getElementById("footerSubtitle");
 
-    if (settings.title) {
-      document.title = settings.title;
+    if (siteTitle) {
+      document.title = siteTitle;
 
       if (footerTitle) {
-        footerTitle.textContent = settings.title;
+        footerTitle.textContent = siteTitle;
       }
     }
 
-    if (settings.subtitle && footerSubtitle) {
-      footerSubtitle.textContent = settings.subtitle;
+    if (siteSubtitle && footerSubtitle) {
+      footerSubtitle.textContent = siteSubtitle;
+    }
+
+    const footerBottom =
+      document.querySelector(".footer-bottom p");
+
+    if (footerText && footerBottom) {
+      const yearElement =
+        document.getElementById("currentYear");
+
+      const year =
+        yearElement?.textContent ||
+        new Date().getFullYear();
+
+      footerBottom.textContent =
+        `© ${year} ${footerText}`;
     }
   } catch (error) {
-    console.error(error);
+    console.error("Settings load error:", error);
   }
 }
 

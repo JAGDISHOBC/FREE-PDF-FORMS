@@ -23,7 +23,7 @@
       <div>
         <p class="eyebrow">CONTROL CENTER</p>
         <h2>Welcome, <span id="adminUsername">Admin</span> 👋</h2>
-        <p class="muted">Manage your public content safely from one place. Phase 3D adds Government Links management.</p>
+        <p class="muted">Manage your public content safely from one place. Phase 3E adds Website Settings management.</p>
       </div>
       <div class="status-pill">● Secure session active</div>
     </section>
@@ -226,6 +226,37 @@
         </form>
       </section>
     </div>
+
+    <section class="manager-card" id="settingsManager">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">WEBSITE SETTINGS</p>
+          <h2>Website Settings</h2>
+          <p class="muted">Update the public website title, subtitle and footer text.</p>
+        </div>
+      </div>
+
+      <form id="settingsForm">
+        <div class="form-grid">
+          <div>
+            <label for="siteTitle">Website title</label>
+            <input id="siteTitle" maxlength="200" required placeholder="Free PDF Forms &amp; Government Resources">
+          </div>
+          <div>
+            <label for="siteSubtitle">Website subtitle</label>
+            <input id="siteSubtitle" maxlength="500" placeholder="Government forms and useful resources in one place">
+          </div>
+        </div>
+
+        <label for="footerText">Footer text</label>
+        <input id="footerText" maxlength="300" placeholder="Free PDF Forms &amp; Government Resources">
+
+        <div id="settingsMessage" class="message" role="status" aria-live="polite"></div>
+        <div class="modal-actions">
+          <button id="saveSettingsButton" class="primary-button" type="submit">Save Website Settings</button>
+        </div>
+      </form>
+    </section>
 
     <div id="departmentModal" class="modal hidden" aria-hidden="true">
       <div class="modal-backdrop" data-close-modal="1"></div>

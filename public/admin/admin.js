@@ -63,6 +63,7 @@
       await loadForms();
       await loadDepartmentOptions();
       await loadLinks();
+      await loadSettings();
     } catch (error) {
       if (error.status === 401) {
         window.location.href = "/admin/login";
@@ -570,6 +571,54 @@
       showMessage($("linkFormMessage"), error.message || "Unable to save government link.");
     } finally {
       save.disabled = false;
+    }
+  });
+
+  async function loadSettings() {
+    try {
+      const result = await api("/api/admin/settings");
+      const settings = result.data.settings || {};
+      $("siteTitle").value = settings.site_title || "";
+      $("siteSubtitle").value = settings.site_subtitle || "";
+      $("footerText").value = settings.footer_text || "";
+    } catch (error) {
+      if (error.status === 401) {
+        window.location.href = "/admin/login";
+        return;
+      }
+      showMessage($("settingsMessage"), error.message || "Unable to load website settings.");
+    }
+  }
+
+  $("settingsForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = $("saveSettingsButton");
+    const payload = {
+      site_title: $("siteTitle").value.trim(),
+      site_subtitle: $("siteSubtitle").value.trim(),
+      footer_text: $("footerText").value.trim()
+    };
+
+    button.disabled = true;
+    showMessage($("settingsMessage"), "Saving…", "success");
+    try {
+      const result = await api("/api/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify(payload)
+      });
+      const settings = result.data.settings || payload;
+      $("siteTitle").value = settings.site_title || "";
+      $("siteSubtitle").value = settings.site_subtitle || "";
+      $("footerText").value = settings.footer_text || "";
+      showMessage($("settingsMessage"), "Website settings saved successfully.", "success");
+    } catch (error) {
+      if (error.status === 401) {
+        window.location.href = "/admin/login";
+        return;
+      }
+      showMessage($("settingsMessage"), error.message || "Unable to save website settings.");
+    } finally {
+      button.disabled = false;
     }
   });
 
